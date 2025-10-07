@@ -1,56 +1,64 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>بَسّام ماث برو 🧠 — حلّ تفصيلي بالعربية</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <script defer src="/static/main.js"></script>
-  <meta name="theme-color" content="#0b0f19">
+
+  <title>بسّام مات برو — حل تفصيلي بالعربية</title>
+
+  <style>
+    :root{--bg:#0b0f19;--panel:#12192b;--ink:#e7e7f2;--sub:#aeb6d6;--accent:#9a78ff;--accent2:#7a5df3;--ok:#1ccb8a;--err:#ff6b6b}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans Arabic",Tahoma,Arial}
+    .wrap{max-width:900px;margin:32px auto;padding:16px}
+    h1{font-weight:800;letter-spacing:.2px;margin:0 0 16px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .input{flex:1;min-width:240px;padding:16px 14px;border-radius:14px;background:#0f1526;color:var(--ink);border:1px solid #1b2340;font-size:18px}
+    .select{padding:12px;border-radius:12px;background:#0f1526;color:var(--ink);border:1px solid #1b2340}
+    .btn{background:var(--accent);border:none;color:white;padding:14px 18px;border-radius:14px;font-weight:700;cursor:pointer}
+    .btn:active{transform:translateY(1px)}
+    .panel{background:var(--panel);border:1px solid #1b2340;border-radius:16px;padding:16px;margin-top:14px}
+    .section-title{color:#c8c9ff;margin:.25rem 0 .5rem}
+    .result-line{font-size:20px;line-height:1.7;word-break:break-word}
+    .muted{color:var(--sub)}
+    .err{color:#fff;background:#361a22;border:1px solid #7b2337;border-radius:12px;padding:12px}
+    .note{color:#9fb6ff;font-size:14px}
+    .footer{opacity:.7;margin-top:24px;text-align:center;font-size:13px}
+    .toggle{display:inline-flex;gap:8px;align-items:center;padding:10px 12px;border:1px solid #1b2340;border-radius:12px;background:#0f1526}
+    label{font-size:14px;color:#cfd6ff}
+  </style>
+
+  <!-- MathJax for pretty Arabic math rendering -->
+  <script>
+    window.MathJax = { tex: { inlineMath: [['\\(','\\)'], ['$', '$']] } };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
-  <header class="top">
-    <h1>🧠 بَسّام ماث برو — حلّ تفصيلي لكل المسائل</h1>
-    <p class="sub">حلول فورية مع الشرح بالعربية • يدعم الكيبورد والكاميرا 📷</p>
-  </header>
+  <div class="wrap">
+    <h1>بسّام مات برو — حل تفصيلي بالعربية</h1>
 
-  <main class="card">
-    <form id="solveForm" class="center">
-      <input id="q" placeholder="اكتب أو الصق المسألة هنا…" autocomplete="off">
-      <div class="btns">
-        <button id="solveBtn" type="submit">📊 حلّ</button>
-        <select id="mode">
-          <option value="auto">تلقائي</option>
-          <option value="derivative">تفاضل</option>
-          <option value="integral">تكامل</option>
-          <option value="solve">حلّ معادلة</option>
+    <div class="row">
+      <input id="q" class="input" placeholder="اكتب مسألة مثل: x^3 - 5x^2 + 4x - 7*3 أو sin(60)+cos(60)">
+      <button id="solveBtn" class="btn">حــل 📊</button>
+    </div>
+
+    <div class="row" style="margin-top:10px;align-items:center">
+      <div class="toggle">
+        <label for="fmtSelect">تنسيق العرض:</label>
+        <select id="fmtSelect" class="select">
+          <option value="ar" selected>رياضي مُنسّق (عربي)</option>
+          <option value="en">إنجليزي نصّي (x^3 - 5x^2 + ...)</option>
         </select>
       </div>
-
-      <div class="camera-zone">
-        <button type="button" id="cameraBtn">📸 التقط صورة</button>
-        <button type="button" id="galleryBtn">🖼️ من الأستوديو</button>
-        <input type="file" id="fileInput" accept="image/*" hidden>
-      </div>
-    </form>
-
-    <section id="keyboard" class="keyboard">
-      <div class="keys">
-        <button>×</button><button>÷</button><button>+</button><button>-</button>
-        <button>x</button><button>y</button><button>^</button><button>=</button>
-        <button>(</button><button>)</button><button>√</button><button>π</button>
-        <button>sin(</button><button>cos(</button><button>tan(</button><button>Abs(</button>
-        <button>d/dx</button><button>∫</button><button>|x|</button><button>CLR</button>
-      </div>
-    </section>
-
-    <div id="output" class="output">
-      <p>اكتب مسألتك ثم اضغط "حلّ" لرؤية الخطوات.</p>
+      <div class="note">الشرح دائمًا بالعربية—فقط طريقة عرض النتيجة تتغيّر.</div>
     </div>
-  </main>
 
-  <footer>
-    <p>© 2025 بَسّام ماث برو — الإصدار الذكي v2.5</p>
-  </footer>
+    <div id="stepsBox" class="panel"></div>
+    <div id="resultBox" class="panel"></div>
+
+    <div class="footer">© 2025 بسّام مات برو — الإصدار الذكي 3.0</div>
+  </div>
+
+  <script src="/static/main.js"></script>
 </body>
 </html>
