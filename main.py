@@ -10,10 +10,11 @@ from fastapi.templating import Jinja2Templates
 from sympy import (
     symbols, Symbol, Eq, S, Matrix, eye, Poly, simplify, expand, factor,
     together, apart, diff, integrate, nroots, discriminant, Rational,
-    sin, cos, tan, exp, log, sqrt, solveset, fraction, pi
+    sin, cos, tan, exp, log, sqrt, solveset, fraction, pi, Abs
 )
 from sympy.parsing.sympy_parser import (
-    parse_expr, standard_transformations, implicit_multiplication_application
+    parse_expr, standard_transformations, implicit_multiplication_application,
+    convert_xor   # ⬅️ يحوّل ^ إلى ** تلقائياً
 )
 from sympy.printing.str import sstr
 
@@ -21,7 +22,11 @@ app = FastAPI(title="Bassam Mathematics Pro — Arabic / Degrees")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-TRANSFORMS = standard_transformations + (implicit_multiplication_application,)
+# ⬅️ التحويلات: ضرب ضمني + تحويل ^ إلى **.
+TRANSFORMS = standard_transformations + (
+    implicit_multiplication_application,
+    convert_xor,
+)
 
 def T(x) -> str:
     try: return sstr(x)
@@ -30,11 +35,19 @@ def T(x) -> str:
 def step(title: str, content: str) -> Dict[str, str]:
     return {"title": title, "content": content}
 
+# ⬅️ تنظيف الإدخال: أرقام عربية، ÷×√، π، |x| → Abs(x)، ^ → **.
 def normalize_text(q: str) -> str:
     q = (q or "").strip()
     q = q.replace("÷", "/").replace("×", "*").replace("√", "sqrt")
+    q = q.replace("–", "-").replace("—", "-")
     ar = "٠١٢٣٤٥٦٧٨٩"; en = "0123456789"
     q = q.translate(str.maketrans(ar, en))
+    q = q.replace("^", "**")           # أسس
+    q = q.replace("π", "pi").replace("،", ",")
+    try:
+        q = re.sub(r"\|([^|]+)\|", r"Abs(\1)", q)  # مطلق
+    except Exception:
+        pass
     return q
 
 def parse(q: str):
@@ -45,6 +58,7 @@ def choose_symbol(expr):
     return syms[0] if syms else symbols("x")
 
 # --------- درجات بدلاً من الراديان للدوال المثلثية ----------
+from sympy import pi
 def trig_degrees(expr):
     if expr.func in (sin, cos, tan):
         a = trig_degrees(expr.args[0])
@@ -96,7 +110,7 @@ def rule_name(term, x: Symbol) -> str:
     if term.is_Pow and term.base == x: return "قاعدة القوة: d(x^n)/dx = n·x^(n-1)"
     if term.is_Mul and any(t.has(x) for t in term.args): return "قاعدة الضرب: (uv)' = u'v + uv'"
     if term.is_Add: return "قاعدة الجمع: (u+v)' = u' + v'"
-    if term.func in (sin, cos, tan, exp, log, sqrt): return f"مشتقة الدالة {term.func.__name__}"
+    if term.func in (sin, cos, tan, exp, log, sqrt, Abs): return f"مشتقة الدالة {term.func.__name__}"
     return "قواعد التفاضل العامة + تبسيط"
 
 def do_derivative(text: str) -> Dict[str, Any]:
