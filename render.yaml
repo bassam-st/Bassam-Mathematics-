@@ -1,11 +1,12 @@
 services:
   - type: web
-    name: bassam-math
-    env: python
+    name: bassam-mathematics
+    runtime: python
     region: oregon
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: python3 main.py
+    autoDeploy: true
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python3 main.py"
     envVars:
-      - key: PORT
-        value: 10000
+      - key: PYTHONUNBUFFERED
+        value: "1"
