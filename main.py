@@ -1,107 +1,116 @@
-# main.py — Bassam Mathematics Pro (v2.7, Arabic NLU + Verbose Explain)
-import re
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+import os
+from flask import Flask, render_template, request, jsonify
+from sympy import sympify, simplify, latex, Number
+from sympy.parsing.sympy_parser import (
+    standard_transformations, implicit_multiplication_application
+)
 
-from core.solver import smart_solve  # v2.7 supports verbose flag
+app = Flask(__name__, static_url_path="/static", template_folder="templates")
 
-app = FastAPI(title="Bassam Mathematics Pro — حل تفصيلي ذكي بالعربية")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+# ---------- أدوات مساعدة ----------
 
-_ZW_RE = re.compile(r"[\u200e\u200f\u202a-\u202e\u2066-\u2069]")
-_AR_DIGITS = "٠١٢٣٤٥٦٧٨٩"
-_EN_DIGITS = "0123456789"
+def to_caret(expr) -> str:
+    """
+    يحوّل تمثيل SymPy النصّي إلى شكل x^3 و x^2 باستخدام ^،
+    ويضع نقطة وسطية للضرب لتوضيح الشكل للمستخدم.
+    """
+    s = str(expr)
+    s = s.replace('**', '^')  # قوّة
+    s = s.replace('*', '·')   # ضرب
+    return s
 
-def _strip_zw(s: str) -> str: return _ZW_RE.sub("", s or "")
-def _arabic_digits_to_en(s: str) -> str: return s.translate(str.maketrans(_AR_DIGITS, _EN_DIGITS))
+def arabic_steps_for(expr, original_text):
+    """
+    يبني شرحًا عربيًا مختصرًا خطوة بخطوة.
+    يمكن توسعته لاحقًا ليشمل مزيد من الحالات.
+    """
+    steps = []
+    steps.append("<h3 class='section-title'>الوضع: حساب — شرح مُوسع</h3>")
 
-_WORD_MAP = [
-    ("القيمة المطلقة", "Abs"), ("قيمة مطلقة", "Abs"),
-    ("جذر تربيعي", "sqrt"), ("جذر مربع", "sqrt"), ("جذر", "sqrt"),
-    ("يساوي", "="), ("تساوي", "="),
-    ("زائد", "+"), ("جمع", "+"),
-    ("ناقص", "-"), ("طرح", "-"),
-    ("في", "*"), ("ضرب", "*"),
-    ("على", "/"), ("قسمة", "/"),
-    ("باي", "pi"),
-]
-_TRIG_FUNCS = r"(sin|cos|tan)"
+    # الخطوة 1: عرض المسألة كما كُتبت
+    safe_orig = (original_text or "").replace('<', '&lt;').replace('>', '&gt;')
+    steps.append("<h4>الخطوة 1:</h4>")
+    steps.append(f"<p>المعادلة كما أُدخِلت: <code>{safe_orig}</code></p>")
 
-def _replace_ar_words(s: str) -> str:
-    s = " " + s + " "
-    for w, t in sorted(_WORD_MAP, key=lambda x: -len(x[0])):
-        s = re.sub(rf"(?<!\w){re.escape(w)}(?!\w)", f" {t} ", s)
-    return s.strip()
+    # الخطوة 2: تبسيط رمزي عام
+    simp = simplify(expr)
+    if str(simp) != str(expr):
+        steps.append("<h4>الخطوة 2:</h4>")
+        steps.append("<p>نُبسّط التعبير جبريًّا دون تغيير معناه.</p>")
+        steps.append(f"<div class='result-line'>قبل: <code>{to_caret(expr)}</code></div>")
+        steps.append(f"<div class='result-line'>بعد: <code>{to_caret(simp)}</code></div>")
+    else:
+        steps.append("<h4>الخطوة 2:</h4>")
+        steps.append("<p>لا يحتاج التعبير لتبسيط إضافي.</p>")
 
-def _wrap_trig_without_paren(s: str) -> str:
-    return re.sub(rf"\b{_TRIG_FUNCS}\s+([A-Za-z0-9_.+-]+)", r"\1(\2)", s)
+    # الخطوة 3: إن أمكن، تقييم ثوابت مستقلة عن المتغيرات
+    if len(simp.free_symbols) == 0:
+        try:
+            val = simp.evalf(15)
+            steps.append("<h4>الخطوة 3:</h4>")
+            steps.append(f"<p>التعبير عددي بالكامل، ونقيّمه بدقة مناسبة:</p>")
+            steps.append(f"<div class='result-line'><b>القيمة</b> ≈ {val}</div>")
+        except Exception:
+            pass
 
-def _trig_with_degree_no_paren(s: str) -> str:
-    return re.sub(rf"\b{_TRIG_FUNCS}\s+([+\-]?\d+(?:\.\d+)?)\s*(?:درجة|°)", r"\1(\2)", s)
+    return "\n".join(steps), simp
 
-def _abs_bars_to_Abs(s: str) -> str:
-    try: return re.sub(r"\|([^|]+)\|", r"Abs(\1)", s)
-    except Exception: return s
+# ---------- الواجهات ----------
 
-def _trig_degrees_in_paren(s: str) -> str:
-    def repl(m):
-        func, num = m.group(1), m.group(2)
-        if re.search(r"[a-df-zA-DF-Z_]", num): return m.group(0)
-        return f"{func}(pi*({num})/180)"
-    return re.sub(rf"\b{_TRIG_FUNCS}\s*\(\s*([+\-]?\d+(?:\.\d+)?)\s*\)", repl, s)
+@app.get("/")
+def index():
+    return render_template("index.html")
 
-def normalize_text(q: str) -> str:
-    q = _strip_zw(q)
-    q = (q or "").strip()
-    q = q.replace("÷", "/").replace("×", "*").replace("√", "sqrt")
-    q = q.replace("–", "-").replace("—", "-").replace("،", ",").replace("°", " درجة")
-    q = q.replace("^", "**").replace("π", "pi")
-    q = _arabic_digits_to_en(q)
-    q = _replace_ar_words(q)
-    q = _trig_with_degree_no_paren(q)
-    q = _wrap_trig_without_paren(q)
-    q = _abs_bars_to_Abs(q)
-    q = _trig_degrees_in_paren(q)
-    q = re.sub(r"\s+", " ", q).replace(" (", "(").replace(") ", ")").strip()
-    return q
+@app.post("/api/solve")
+def api_solve():
+    data = request.get_json(force=True, silent=True) or {}
+    user_text = (data.get("q") or "").strip()
 
-def parse_intent_ar(raw: str):
-    s = _strip_zw((raw or "")).lower()
-    if re.search(r"(اشتق|مشتق|تفاضل|المشتقة)", s):
-        m = re.search(r"(?:اشتق|مشتق|تفاضل|المشتقة)\s*(.*)", s)
-        expr = m.group(1).strip() if m and m.group(1) else "x"
-        return "derivative", expr
-    if re.search(r"(تكامل|اكامل|أوجد التكامل|∫)", s):
-        m = re.search(r"(?:تكامل|اكامل|أوجد التكامل|∫)\s*(.*)", s)
-        expr = m.group(1).strip() if m and m.group(1) else "x"
-        return "integral", expr
-    if re.search(r"(حل|أوجد|جد)\s*(?:المعادلة|النظام)?", s) and ("=" in s or ";" in s):
-        return "solve", raw
-    return "auto", raw
+    if not user_text:
+        return jsonify({"ok": False, "error": "أدخل مسألة لحلّها."}), 400
 
-@app.get("/", response_class=HTMLResponse)
-def index(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "title": "بسّام ماث برو — حل تفصيلي بالعربية"}
-    )
-
-@app.post("/solve")
-async def solve_api(request: Request):
     try:
-        data = await request.json()
-    except Exception:
-        return JSONResponse({"ok": False, "error": "صيغة الطلب غير صحيحة"})
+        # دعم الضرب الضمني: 2x ، 3(x+1) ، إلخ
+        expr = sympify(
+            user_text,
+            transformations=(standard_transformations + (implicit_multiplication_application,))
+        )
 
-    raw_q = data.get("q", "") or ""
-    ui_mode = (data.get("mode", "auto") or "auto").lower()
-    explain = (data.get("explain", "normal") or "normal").lower()
+        # شرح بالعربية + تبسيط
+        steps_html, simplified = arabic_steps_for(expr, user_text)
 
-    # trigger verbose إن كتب المستخدم كلمات دلالية
-    verbose_triggers = ("شرح", "بالتفصيل", "#شرح", "شرح موسع", "شرح مُوسّع")
+        # صيغتا العرض
+        caret_text = to_caret(simplified)  # x^3 - 5x^2 ... بنص إنجليزي
+        ar_latex   = latex(simplified)     # LaTeX للعرض العربي المنسّق
+
+        # لو كانت قيمة عددية خالصة، أعدّ قيمة رقمية أيضًا
+        numeric_value = None
+        if len(simplified.free_symbols) == 0:
+            try:
+                v = simplified.evalf(15)
+                if isinstance(v, Number) or isinstance(v, float) or True:
+                    numeric_value = str(v)
+            except Exception:
+                pass
+
+        return jsonify({
+            "ok": True,
+            "steps_html": steps_html,
+            "pretty": {
+                "en_text": caret_text,
+                "ar_latex": ar_latex
+            },
+            "numeric_value": numeric_value
+        })
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"خطأ في قراءة المسألة: {e}"}), 400
+
+
+if __name__ == "__main__":
+    # PORT لبيئات الاستضافة (اختياري)
+    port = int(os.getenv("PORT", "8000"))
+    app.run(host="0.0.0.0", port=port)    verbose_triggers = ("شرح", "بالتفصيل", "#شرح", "شرح موسع", "شرح مُوسّع")
     verbose = explain in ("extended", "verbose") or any(t in raw_q for t in verbose_triggers)
 
     inferred_mode, inferred_expr = parse_intent_ar(raw_q)
