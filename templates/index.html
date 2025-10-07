@@ -9,11 +9,14 @@
   <link rel="manifest" href="/static/pwa/manifest.json">
   <meta name="theme-color" content="#0b0f19"/>
 
-  <!-- ستايل عام -->
+  <!-- CSS -->
   <link rel="stylesheet" href="/static/style.css"/>
 
+  <!-- Tesseract.js للـ OCR (متصفح فقط) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
   <style>
-    /* تحسينات بسيطة للوحة المفاتيح */
+    /* تحسينات بسيطة فوق style.css */
     .kbd {display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:12px}
     .kbd button{padding:12px;border:none;border-radius:10px;background:#2a2f45;color:#fff;font-weight:600}
     .kbd button:hover{background:#353c59}
@@ -21,10 +24,12 @@
     .kbd .danger{background:#ff4d6d}
     .row{display:flex;gap:8px;align-items:center}
     .row>*{flex:1}
-    #steps .step{margin:10px 0;border-bottom:1px solid #3b3f59;padding-bottom:6px}
-    details.help{margin-top:14px;background:#131725;padding:12px;border-radius:12px}
     textarea#q{width:100%;min-height:58px;resize:vertical}
-    .card{max-width:680px}
+    .card{max-width:820px}
+    .hidden{display:none}
+    #ocrBox{display:flex;gap:10px;align-items:center;margin-top:8px}
+    #ocrPreview{width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #2a3250;background:#141a2a}
+    #ocrStatus{font-size:.95rem;color:#bfc6da}
   </style>
 </head>
 <body>
@@ -45,6 +50,14 @@
       <option value="matrix">مصفوفات</option>
     </select>
     <button id="solveBtn" class="primary">حل 🧮</button>
+  </div>
+
+  <!-- كاميرا + OCR -->
+  <div id="ocrBox">
+    <input id="imgInput" type="file" accept="image/*" capture="environment" class="hidden">
+    <button id="cameraBtn">📷 صورة مسألة</button>
+    <img id="ocrPreview" class="hidden" alt="preview">
+    <div id="ocrStatus"></div>
   </div>
 
   <!-- لوحة المفاتيح الرياضية -->
@@ -117,18 +130,14 @@
     <div class="help-grid">
       <h4>١) كيف أكتب المسألة؟</h4>
       <ul>
-        <li>الأعداد والعمليات: <code>2+3*(4-1)</code>، الكسور: <code>3/4</code>، الأسس: <code>x^2</code> أو <code>x**2</code></li>
+        <li>العمليات: <code>2+3*(4-1)</code>، الكسور: <code>3/4</code>، الأسس: <code>x^2</code> أو <code>x**2</code></li>
         <li>الجذر: <code>sqrt(x)</code>، الدوال: <code>sin(x)</code>، <code>cos(x)</code>، <code>log(x)</code>، <code>exp(x)</code></li>
         <li>التفاضل: اختر الوضع <b>تفاضل</b> أو اكتب <code>مشتق f(x)</code></li>
         <li>التكامل: اختر الوضع <b>تكامل</b> أو اكتب <code>تكامل f(x)</code></li>
-        <li>المعادلات: مثال درجة ثانية: <code>x^2 - 5*x + 6 = 0</code></li>
+        <li>المعادلات: مثال: <code>x^2 - 5*x + 6 = 0</code></li>
         <li>نظام معادلات (افصل بـ ;): <code>x+y=1; 2*x-3*y=5</code></li>
         <li>مصفوفات: <code>det([[1,2],[3,4]])</code>، <code>inv([[1,2],[3,4]])</code>، <code>rref([[...]]</code>)</li>
-      </ul>
-      <h4>٢) ملاحظات</h4>
-      <ul>
-        <li>استخدم <b>*</b> للضرب و<b>/</b> للقسمة و<b>^</b> أو <b>**</b> للأس.</li>
-        <li>التطبيق يعرض <b>الخطوات التفصيلية</b> لكل عملية.</li>
+        <li>من الكاميرا: اضغط <b>📷 صورة مسألة</b> ثم تأكد من تصحيح الرموز إن لزم (× ⇒ <code>*</code> ، ÷ ⇒ <code>/</code> ، √ ⇒ <code>sqrt</code> …).</li>
       </ul>
     </div>
   </details>
@@ -138,7 +147,7 @@
 <section id="result" class="card" style="margin-top:14px"></section>
 
 <script>
-  // تسجيل SW إن وجد
+  // تسجيل Service Worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/static/pwa/sw.js').catch(()=>{});
   }
@@ -170,21 +179,20 @@
     q.setSelectionRange(pos,pos);
   }
 
-  // توصيل أزرار الكيبورد
+  // لوحة المفاتيح
   document.getElementById("kbd").addEventListener("click", (e)=>{
     const btn = e.target.closest("button");
     if(!btn) return;
     if(btn.dataset.k){ insert(btn.dataset.k); return; }
 
     switch(btn.id){
-      case "bksp": { // حذف حرف
+      case "bksp": {
         const s = q.selectionStart ?? q.value.length;
         if(s>0){
           q.value = q.value.slice(0,s-1) + q.value.slice(q.selectionEnd ?? s);
           q.setSelectionRange(s-1, s-1);
         }
-        q.focus();
-        break;
+        q.focus(); break;
       }
       case "clr":  q.value=""; q.focus(); break;
       case "pow2": insert("^2"); break;
@@ -198,34 +206,31 @@
       case "semi": insert("; "); break;
       case "lbrack": insert("["); break;
       case "rbrack": insert("]"); break;
-      default: break;
     }
   });
 
-  // دوال بقوالب تلقائية sin(...) إلخ
+  // قوالب الدوال sin/...
   document.querySelectorAll('[data-t]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      const f = btn.dataset.t; // sin / cos / ...
+      const f = btn.dataset.t;
       insert(f + "()");
-      // ضع المؤشر داخل الأقواس
       const pos = (q.selectionStart ?? q.value.length) - 1;
       q.setSelectionRange(pos,pos);
       q.focus();
     });
   });
 
-  // أمثلة جاهزة
+  // أمثلة
   $("#example1").onclick = ()=>{ q.value="3*(2-6)/(12+8)"; modeSel.value="evaluate"; };
   $("#example2").onclick = ()=>{ q.value="x^3*sin(x)";    modeSel.value="derivative"; };
   $("#example3").onclick = ()=>{ q.value="x+y=1; 2*x-3*y=5"; modeSel.value="solve"; };
 
-  // زر الحل
+  // تنفيذ الحل
   solveBtn.onclick = async ()=>{
     const query = q.value.trim();
     if(!query){ return; }
     stepsDiv.innerHTML = "<p>⏳ جاري الحل…</p>";
     resultDiv.innerHTML = "";
-
     try{
       const data = await postJSON("/solve", { q: query, mode: modeSel.value });
       if(!data.ok){
@@ -242,11 +247,70 @@
       stepsDiv.innerHTML = `<p style="color:#ff6b6b">❌ ${err}</p>`;
     }
   };
-
-  // Enter للتنفيذ
   q.addEventListener("keydown",(e)=>{
     if(e.key==="Enter" && (e.metaKey||e.ctrlKey||!e.shiftKey)){ e.preventDefault(); solveBtn.click(); }
   });
+
+  // --------- 📷 الكاميرا + OCR ----------
+  const cameraBtn = $("#cameraBtn");
+  const imgInput  = $("#imgInput");
+  const ocrPrev   = $("#ocrPreview");
+  const ocrStatus = $("#ocrStatus");
+
+  cameraBtn.onclick = ()=> imgInput.click();
+
+  imgInput.onchange = async (e)=>{
+    const file = e.target.files?.[0];
+    if(!file) return;
+
+    // عرض المعاينة
+    ocrPrev.src = URL.createObjectURL(file);
+    ocrPrev.classList.remove("hidden");
+
+    // تشغيل OCR
+    ocrStatus.textContent = "🔎 قراءة النص من الصورة…";
+    try{
+      const res = await Tesseract.recognize(file, 'eng', {
+        logger: m => {
+          if(m.status === 'recognizing text'){
+            ocrStatus.textContent = `🔎 التعرف: ${Math.round(m.progress*100)}%`;
+          }
+        }
+      });
+      let text = (res.data.text || "").trim();
+      text = normalizeOcr(text);
+      // أدرج النص في مربع المسألة وشغّل الحل تلقائيًا
+      q.value = text;
+      ocrStatus.textContent = "✅ تم التقاط النص. اضغط حل أو سيتم الحل تلقائيًا…";
+      setTimeout(()=>solveBtn.click(), 300);
+    }catch(err){
+      ocrStatus.textContent = "❌ فشل التعرف على النص";
+      console.error(err);
+    }
+  };
+
+  // تنظيف وتحويل نص الـOCR إلى صيغة رياضية مناسبة لـ SymPy
+  function normalizeOcr(t){
+    // توحيد الأرقام العربية/الرموز
+    const arabicNums = '٠١٢٣٤٥٦٧٨٩';
+    const latinNums  = '0123456789';
+    for(let i=0;i<10;i++){
+      t = t.replaceAll(arabicNums[i], latinNums[i]);
+    }
+    return t
+      .replace(/[×xX] ?(?=\d|\w)/g, '*')      // × أو x كضرب (تقريبية)
+      .replace(/÷/g, '/')
+      .replace(/–|—/g, '-')
+      .replace(/√/g, 'sqrt')
+      .replace(/π/g, 'pi')
+      .replace(/،/g, ',')
+      .replace(/\s*=\s*/g, ' = ')
+      .replace(/[^\S\r\n]+/g, ' ')            // مسافات زائدة
+      .replace(/\s*\n+\s*/g, '; ')            // أسطر جديدة → نظام معادلات
+      .replace(/\s*\)\s*/g, ')')
+      .replace(/\s*\(\s*/g, '(')
+      .trim();
+  }
 </script>
 
 </body>
