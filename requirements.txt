@@ -2,9 +2,4 @@ fastapi
 uvicorn
 jinja2
 sympy
-httpx
-beautifulsoup4
-readability-lxml
-duckduckgo-search
-diskcache
 python-multipart
