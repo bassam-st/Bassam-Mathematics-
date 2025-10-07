@@ -1,0 +1,14 @@
+{
+  "name": "Bassam Mathematics Pro",
+  "short_name": "Bassam Math",
+  "lang": "ar",
+  "dir": "rtl",
+  "display": "standalone",
+  "start_url": "/",
+  "background_color": "#0b0f19",
+  "theme_color": "#b896ff",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
