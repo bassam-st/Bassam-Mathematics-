@@ -1,113 +1,36 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>{{ title }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>بسام ماث — Bassam Mathematics Pro</title>
+  <link rel="manifest" href="/static/pwa/manifest.json">
+  <meta name="theme-color" content="#0b0f19"/>
   <link rel="stylesheet" href="/static/style.css"/>
-  <meta name="description" content="Bassam Math Pro — حل مسائل الرياضيات مع خطوات: ابتدائي إلى هندسة"/>
-  <link rel="manifest" href="/static/manifest.json">
-  <meta name="theme-color" content="#0b0f19">
-  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 </head>
 <body>
-  <header class="top">
-    <h1>📐 Bassam Math Pro — حل مسائل مع الخطوات (ابتدائي → هندسة)</h1>
-    <div class="actions">
-      <button id="toggleHelp" class="ghost">؟ مساعدة</button>
-      <button id="toggleKbd" class="ghost">لوحة</button>
-    </div>
-  </header>
+<header class="top">
+  <h1>🧠 بسام ماث — حلّ تفصيلي لكل المسائل</h1>
+</header>
 
-  <section class="card">
-    <form id="f" class="row" onsubmit="return false;">
-      <input id="q" placeholder="اكتب مسألتك… أمثلة: 2+3/4 , x^2=9 , مشتق x^3 , تكامل sin(x) , [[1,2],[3,4]] , eigenvals([[...]]), diag([[...]])"/>
-      <select id="mode" title="وضع الحل">
-        <option value="auto">تلقائي</option>
-        <option value="evaluate">تبسيط/تقييم</option>
-        <option value="solve">حل معادلة/نظام</option>
-        <option value="derivative">مشتقة</option>
-        <option value="integral">تكامل</option>
-        <option value="matrix">مصفوفات</option>
-      </select>
-      <button id="go">حلّ</button>
-    </form>
+<section class="card">
+  <input id="q" placeholder="اكتب المسألة أو المعادلة هنا...">
+  <div class="row">
+    <select id="mode">
+      <option value="auto">تلقائي</option>
+      <option value="evaluate">حساب عادي</option>
+      <option value="derivative">تفاضل</option>
+      <option value="integral">تكامل</option>
+      <option value="solve">معادلات</option>
+      <option value="matrix">مصفوفات</option>
+    </select>
+    <button id="solveBtn">حل 🧮</button>
+  </div>
+</section>
 
-    <!-- لوحة المفاتيح العلمية -->
-    <div id="kbd" class="kbd hidden" aria-hidden="true"></div>
+<section id="steps"></section>
+<section id="result"></section>
 
-    <!-- نافذة مساعدة/شرح -->
-    <details id="help" class="help">
-      <summary><strong>دليل الاستخدام السريع (اضغط للفتح/الإغلاق)</strong></summary>
-      <div class="help-grid">
-        <div>
-          <h4>١) كيف أكتب المسألة؟</h4>
-          <ul>
-            <li>الأعداد والعمليات: <code>2+3*(4-1)</code>، الكسور: <code>3/4 + 1/6</code></li>
-            <li>متغيّرات: <code>x</code>، <code>y</code>، <code>a</code>…</li>
-            <li>القوى: <code>x**2</code> أو زر <strong>x²</strong>، الجذر: <code>sqrt(x)</code></li>
-            <li>مشتقة: اكتب <code>مشتق x^3*sin(x)</code> أو اختر وضع “مشتقة” واكتب <code>x^3*sin(x)</code></li>
-            <li>تكامل: <code>تكامل sin(x)</code> أو اختر “تكامل” واكتب <code>sin(x)</code></li>
-            <li>مصفوفات: <code>[[1,2],[3,4]]</code> — محدِّد: <code>det([[...]])</code> — معكوس: <code>inv([[...]])</code></li>
-            <li>نظام خطي (مُعزَّز): <code>[[2,1|5],[1,3|7]]</code></li>
-            <li>أنظمة بمعادلات: افصل بـ <code>;</code> مثال: <code>x+y=1; 2x-3y=5</code></li>
-          </ul>
-        </div>
-        <div>
-          <h4>٢) دوال متقدمة</h4>
-          <ul>
-            <li>القيم الذاتية: <code>eigenvals([[...]])</code></li>
-            <li>المتجهات الذاتية: <code>eigenvects([[...]])</code></li>
-            <li>تقطيع قطري: <code>diag([[...]])</code> أو <code>diagonalize([[...]])</code></li>
-            <li>شكل جوردان: <code>jordan([[...]])</code></li>
-            <li>حل كثيرات الحدود حتى الدرجة ٧ (عددياً للدرجات ≥5)</li>
-          </ul>
-        </div>
-        <div>
-          <h4>٣) وضع الزوايا</h4>
-          <p>زر <strong>Rad/Deg</strong> يبدّل بين الراديان والدرجات. عند اختيار Deg نحول تلقائيًا مثل <code>sin(30)</code> → <code>sin(30*pi/180)</code>.</p>
-        </div>
-        <div>
-          <h4>٤) أمثلة جاهزة (انقر للإدراج)</h4>
-          <ul id="examples">
-            <li data-e="2+3*(4-1)">٢ + ٣×(٤ − ١)</li>
-            <li data-e="x^2 - 5x + 6 = 0">x² − 5x + 6 = 0</li>
-            <li data-e="مشتق x^3 * sin(x)">مشتق x³·sin(x)</li>
-            <li data-e="تكامل 1/(x+1)">تكامل 1/(x+1)</li>
-            <li data-e="x+y=1; 2x-3y=5">نظام خطي (٢ متغير)</li>
-            <li data-e="[[2,1|5],[1,3|7]]">مصفوفة مُعزَّزة</li>
-            <li data-e="det([[1,2],[3,4]])">محدد مصفوفة</li>
-            <li data-e="eigenvals([[2,1],[1,2]])">قيم ذاتية</li>
-            <li data-e="diag([[3,0],[0,5]])">Diagonalize</li>
-            <li data-e="jordan([[4,1],[0,4]])">Jordan form</li>
-            <li data-e="x^6 - x - 1 = 0">درجة ٦ (حل عددي)</li>
-          </ul>
-        </div>
-        <div>
-          <h4>٥) نصائح</h4>
-          <ul>
-            <li>استخدم الأقواس بكثرة لتفادي اللبس: <code>(x+1)/(x-1)</code></li>
-            <li>للقيمة المطلقة: <code>Abs(x)</code> (زر |x|)</li>
-            <li>للتربيع سريعًا استخدم زر <strong>x²</strong> أو اكتب <code>**2</code></li>
-            <li>للأنظمة الأكبر: افصل المعادلات بـ <code>;</code> حتى ٥ متغيرات خطية</li>
-          </ul>
-        </div>
-      </div>
-    </details>
-
-    <div id="resultBox" class="result hidden">
-      <h3>النتيجة</h3>
-      <div id="result"></div>
-      <h3>الخطوات</h3>
-      <div id="steps" class="steps collapsed"></div>
-      <button id="moreBtn" class="linklike">عرض المزيد</button>
-    </div>
-  </section>
-
-  <footer class="muted">
-    صنع بحب 🟣 لبسّام — SymPy + FastAPI — يدعم الابتدائي، الثانوي، والجامعة.
-  </footer>
-
-  <script src="/static/main.js"></script>
+<script src="/static/main.js"></script>
 </body>
-  </html>
+</html>
