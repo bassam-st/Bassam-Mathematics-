@@ -5,55 +5,57 @@ from sympy.parsing.sympy_parser import (
     standard_transformations, implicit_multiplication_application
 )
 
+# إنشاء التطبيق
 app = Flask(__name__, static_url_path="/static", template_folder="templates")
 
 # ---------- أدوات مساعدة ----------
 
 def to_caret(expr) -> str:
     """
-    يحوّل تمثيل SymPy النصّي إلى شكل x^3 و x^2 باستخدام ^،
-    ويضع نقطة وسطية للضرب لتوضيح الشكل للمستخدم.
+    يحوّل تمثيل SymPy إلى شكل x^3 و x^2 (باستخدام ^ بدلاً من **)،
+    ويضيف نقطة وسطية للضرب لجعل التعبير أسهل للقراءة.
     """
     s = str(expr)
-    s = s.replace('**', '^')  # قوّة
-    s = s.replace('*', '·')   # ضرب
+    s = s.replace('**', '^')
+    s = s.replace('*', '·')
     return s
+
 
 def arabic_steps_for(expr, original_text):
     """
-    يبني شرحًا عربيًا مختصرًا خطوة بخطوة.
-    يمكن توسعته لاحقًا ليشمل مزيد من الحالات.
+    يبني شرحًا عربيًا خطوة بخطوة لعملية الحل أو التبسيط.
     """
     steps = []
     steps.append("<h3 class='section-title'>الوضع: حساب — شرح مُوسع</h3>")
 
-    # الخطوة 1: عرض المسألة كما كُتبت
+    # الخطوة 1: عرض ما أدخله المستخدم
     safe_orig = (original_text or "").replace('<', '&lt;').replace('>', '&gt;')
     steps.append("<h4>الخطوة 1:</h4>")
     steps.append(f"<p>المعادلة كما أُدخِلت: <code>{safe_orig}</code></p>")
 
-    # الخطوة 2: تبسيط رمزي عام
+    # الخطوة 2: تبسيط التعبير جبرياً
     simp = simplify(expr)
     if str(simp) != str(expr):
         steps.append("<h4>الخطوة 2:</h4>")
-        steps.append("<p>نُبسّط التعبير جبريًّا دون تغيير معناه.</p>")
+        steps.append("<p>نُبسّط التعبير جبريًّا دون تغيير معناه:</p>")
         steps.append(f"<div class='result-line'>قبل: <code>{to_caret(expr)}</code></div>")
         steps.append(f"<div class='result-line'>بعد: <code>{to_caret(simp)}</code></div>")
     else:
         steps.append("<h4>الخطوة 2:</h4>")
         steps.append("<p>لا يحتاج التعبير لتبسيط إضافي.</p>")
 
-    # الخطوة 3: إن أمكن، تقييم ثوابت مستقلة عن المتغيرات
+    # الخطوة 3: إذا كان التعبير عددي بالكامل، نحسب قيمته
     if len(simp.free_symbols) == 0:
         try:
             val = simp.evalf(15)
             steps.append("<h4>الخطوة 3:</h4>")
-            steps.append(f"<p>التعبير عددي بالكامل، ونقيّمه بدقة مناسبة:</p>")
-            steps.append(f"<div class='result-line'><b>القيمة</b> ≈ {val}</div>")
+            steps.append("<p>التعبير عددي بالكامل، ونقيّمه بدقة مناسبة:</p>")
+            steps.append(f"<div class='result-line'><b>القيمة النهائية</b> ≈ {val}</div>")
         except Exception:
             pass
 
     return "\n".join(steps), simp
+
 
 # ---------- الواجهات ----------
 
@@ -61,8 +63,15 @@ def arabic_steps_for(expr, original_text):
 def index():
     return render_template("index.html")
 
+
 @app.post("/api/solve")
 def api_solve():
+    """
+    نقطة API لحل أو تبسيط المسائل الرياضية وإرجاعها بصيغتين:
+    - عرض نصّي إنجليزي (x^3 - 5x^2 ...)
+    - عرض رياضي منسق (LaTeX)
+    مع شرح تفصيلي بالعربية.
+    """
     data = request.get_json(force=True, silent=True) or {}
     user_text = (data.get("q") or "").strip()
 
@@ -70,29 +79,29 @@ def api_solve():
         return jsonify({"ok": False, "error": "أدخل مسألة لحلّها."}), 400
 
     try:
-        # دعم الضرب الضمني: 2x ، 3(x+1) ، إلخ
+        # دعم الضرب الضمني (مثل 2x أو 3(x+1))
         expr = sympify(
             user_text,
             transformations=(standard_transformations + (implicit_multiplication_application,))
         )
 
-        # شرح بالعربية + تبسيط
+        # إعداد الشرح والتبسيط
         steps_html, simplified = arabic_steps_for(expr, user_text)
 
-        # صيغتا العرض
-        caret_text = to_caret(simplified)  # x^3 - 5x^2 ... بنص إنجليزي
-        ar_latex   = latex(simplified)     # LaTeX للعرض العربي المنسّق
+        # صيغ العرض
+        caret_text = to_caret(simplified)   # x^3 - 5x^2 + ...
+        ar_latex   = latex(simplified)      # LaTeX
 
-        # لو كانت قيمة عددية خالصة، أعدّ قيمة رقمية أيضًا
+        # لو التعبير عددي (بدون متغيرات)
         numeric_value = None
         if len(simplified.free_symbols) == 0:
             try:
                 v = simplified.evalf(15)
-                if isinstance(v, Number) or isinstance(v, float) or True:
-                    numeric_value = str(v)
+                numeric_value = str(v)
             except Exception:
                 pass
 
+        # النتيجة النهائية
         return jsonify({
             "ok": True,
             "steps_html": steps_html,
@@ -107,31 +116,8 @@ def api_solve():
         return jsonify({"ok": False, "error": f"خطأ في قراءة المسألة: {e}"}), 400
 
 
+# ---------- تشغيل التطبيق ----------
+
 if __name__ == "__main__":
-    # PORT لبيئات الاستضافة (اختياري)
     port = int(os.getenv("PORT", "8000"))
-    app.run(host="0.0.0.0", port=port)    verbose_triggers = ("شرح", "بالتفصيل", "#شرح", "شرح موسع", "شرح مُوسّع")
-    verbose = explain in ("extended", "verbose") or any(t in raw_q for t in verbose_triggers)
-
-    inferred_mode, inferred_expr = parse_intent_ar(raw_q)
-    mode = ui_mode if ui_mode != "auto" else inferred_mode
-    expr_raw = raw_q if ui_mode != "auto" else inferred_expr
-    expr = normalize_text(expr_raw)
-
-    if mode == "derivative":   query = f"تفاضل {expr}"
-    elif mode == "integral":   query = f"تكامل {expr}"
-    elif mode == "solve":      query = expr
-    else:                      query = expr
-
-    out = smart_solve(query, verbose=verbose)
-    if "error" in out:
-        return JSONResponse({"ok": False, "error": out["error"]})
-
-    return JSONResponse({
-        "ok": True,
-        "mode": out.get("type", mode),
-        "result": out.get("result", ""),
-        "steps": out.get("steps", []),
-        "raw": query,
-        "verbose": verbose,
-    })
+    app.run(host="0.0.0.0", port=port)
