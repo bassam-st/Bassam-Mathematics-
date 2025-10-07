@@ -1,36 +1,29 @@
-// 🎯 Bassam Mathematics Pro - Service Worker (للتشغيل بدون إنترنت)
+// 🎯 Bassam Mathematics Pro - Service Worker
 
-self.addEventListener('install', event => {
-  console.log('🟣 Service Worker: installing...');
-  event.waitUntil(
-    caches.open('bassam-math-cache-v1').then(cache => {
-      return cache.addAll([
-        '/',
-        '/static/style.css',
-        '/static/main.js',
-        '/static/pwa/manifest.json'
-      ]);
-    })
+const CACHE = "bassam-math-cache-v1";
+const ASSETS = [
+  "/",
+  "/static/style.css",
+  "/static/main.js",
+  "/static/pwa/manifest.json"
+];
+
+self.addEventListener("install", e => {
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(ASSETS))
   );
 });
 
-self.addEventListener('activate', event => {
-  console.log('🟢 Service Worker: activated');
-  event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.filter(key => key !== 'bassam-math-cache-v1')
-            .map(key => caches.delete(key))
-      );
-    })
+self.addEventListener("activate", e => {
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    )
   );
 });
 
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request).then(response => {
-      // ✅ استخدم الملف من الكاش إذا كان متوفرًا، أو من الإنترنت إن لم يكن
-      return response || fetch(event.request);
-    })
+self.addEventListener("fetch", e => {
+  e.respondWith(
+    caches.match(e.request).then(r => r || fetch(e.request))
   );
 });
