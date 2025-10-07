@@ -1,3 +1,2 @@
-flask
-sympy
-gunicorn
+Flask==3.0.3
+sympy==1.12
