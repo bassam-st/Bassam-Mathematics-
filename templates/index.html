@@ -2,21 +2,23 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>بسام ماث — Bassam Mathematics Pro</title>
 
   <!-- PWA -->
   <link rel="manifest" href="/static/pwa/manifest.json">
   <meta name="theme-color" content="#0b0f19"/>
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/static/icons/icon-512.png"/>
 
-  <!-- CSS -->
   <link rel="stylesheet" href="/static/style.css"/>
 
-  <!-- Tesseract.js للـ OCR (متصفح فقط) -->
+  <!-- Tesseract.js OCR -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
-    /* تحسينات بسيطة فوق style.css */
     .kbd {display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:12px}
     .kbd button{padding:12px;border:none;border-radius:10px;background:#2a2f45;color:#fff;font-weight:600}
     .kbd button:hover{background:#353c59}
@@ -25,9 +27,9 @@
     .row{display:flex;gap:8px;align-items:center}
     .row>*{flex:1}
     textarea#q{width:100%;min-height:58px;resize:vertical}
-    .card{max-width:820px}
+    .card{max-width:860px}
     .hidden{display:none}
-    #ocrBox{display:flex;gap:10px;align-items:center;margin-top:8px}
+    #ocrBox{display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap}
     #ocrPreview{width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #2a3250;background:#141a2a}
     #ocrStatus{font-size:.95rem;color:#bfc6da}
   </style>
@@ -38,7 +40,7 @@
 </header>
 
 <section class="card">
-  <textarea id="q" placeholder="اكتب المسألة هنا… مثل: 3*(2-6)/(12+8) أو مشتق x^3*sin(x)"></textarea>
+  <textarea id="q" placeholder="اكتب المسألة هنا… مثل: sin(60)+25 أو مشتق x^3*sin(x) أو x+y=1;2*x-y=3"></textarea>
 
   <div class="row">
     <select id="mode">
@@ -52,71 +54,25 @@
     <button id="solveBtn" class="primary">حل 🧮</button>
   </div>
 
-  <!-- كاميرا + OCR -->
+  <!-- كاميرا + استديو + OCR -->
   <div id="ocrBox">
-    <input id="imgInput" type="file" accept="image/*" capture="environment" class="hidden">
-    <button id="cameraBtn">📷 صورة مسألة</button>
+    <input id="camInput" type="file" accept="image/*" capture="environment" class="hidden">
+    <input id="galInput" type="file" accept="image/*" class="hidden">
+    <button id="cameraBtn">📷 التقط صورة</button>
+    <button id="galleryBtn">🖼️ من الاستديو</button>
     <img id="ocrPreview" class="hidden" alt="preview">
     <div id="ocrStatus"></div>
   </div>
 
   <!-- لوحة المفاتيح الرياضية -->
   <div class="kbd" id="kbd">
-    <!-- صف 1 -->
-    <button data-k="7">7</button>
-    <button data-k="8">8</button>
-    <button data-k="9">9</button>
-    <button data-k="/">÷</button>
-    <button data-k="*">×</button>
-    <button data-k="^">x^y</button>
-
-    <!-- صف 2 -->
-    <button data-k="4">4</button>
-    <button data-k="5">5</button>
-    <button data-k="6">6</button>
-    <button data-k="+">+</button>
-    <button data-k="-">−</button>
-    <button data-k="(">(</button>
-
-    <!-- صف 3 -->
-    <button data-k="1">1</button>
-    <button data-k="2">2</button>
-    <button data-k="3">3</button>
-    <button data-k=")">)</button>
-    <button data-k=".">.</button>
-    <button id="bksp" class="danger">⌫</button>
-
-    <!-- صف 4 -->
-    <button data-k="0">0</button>
-    <button data-k="x">x</button>
-    <button data-k="y">y</button>
-    <button data-k="z">z</button>
-    <button data-k="pi">π</button>
-    <button data-k="E">e</button>
-
-    <!-- صف 5 -->
-    <button data-t="sin">sin( )</button>
-    <button data-t="cos">cos( )</button>
-    <button data-t="tan">tan( )</button>
-    <button data-t="log">log( )</button>
-    <button data-t="ln">ln( )</button>
-    <button data-t="sqrt">√( )</button>
-
-    <!-- صف 6 -->
-    <button id="pow2">x²</button>
-    <button id="abs">|x|</button>
-    <button id="frac">a/b</button>
-    <button id="ddx">d/dx</button>
-    <button id="intg">∫</button>
-    <button id="mat">Mat</button>
-
-    <!-- صف 7 -->
-    <button id="eq">=</button>
-    <button id="comma">,</button>
-    <button id="semi">;</button>
-    <button id="lbrack">[</button>
-    <button id="rbrack">]</button>
-    <button id="clr" class="danger">CLR</button>
+    <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="/">÷</button><button data-k="*">×</button><button data-k="^">x^y</button>
+    <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="+">+</button><button data-k="-">−</button><button data-k="(">(</button>
+    <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button data-k=")">)</button><button data-k=".">.</button><button id="bksp" class="danger">⌫</button>
+    <button data-k="0">0</button><button data-k="x">x</button><button data-k="y">y</button><button data-k="z">z</button><button data-k="pi">π</button><button data-k="E">e</button>
+    <button data-t="sin">sin( )</button><button data-t="cos">cos( )</button><button data-t="tan">tan( )</button><button data-t="log">log( )</button><button data-t="ln">ln( )</button><button data-t="sqrt">√( )</button>
+    <button id="pow2">x²</button><button id="abs">|x|</button><button id="frac">a/b</button><button id="ddx">d/dx</button><button id="intg">∫</button><button id="mat">Mat</button>
+    <button id="eq">=</button><button id="comma">,</button><button id="semi">;</button><button id="lbrack">[</button><button id="rbrack">]</button><button id="clr" class="danger">CLR</button>
   </div>
 
   <div class="row" style="margin-top:10px">
@@ -126,192 +82,124 @@
   </div>
 
   <details class="help">
-    <summary><strong>دليل الاستخدام السريع (اضغط للفتح/الإغلاق)</strong></summary>
-    <div class="help-grid">
-      <h4>١) كيف أكتب المسألة؟</h4>
-      <ul>
-        <li>العمليات: <code>2+3*(4-1)</code>، الكسور: <code>3/4</code>، الأسس: <code>x^2</code> أو <code>x**2</code></li>
-        <li>الجذر: <code>sqrt(x)</code>، الدوال: <code>sin(x)</code>، <code>cos(x)</code>، <code>log(x)</code>، <code>exp(x)</code></li>
-        <li>التفاضل: اختر الوضع <b>تفاضل</b> أو اكتب <code>مشتق f(x)</code></li>
-        <li>التكامل: اختر الوضع <b>تكامل</b> أو اكتب <code>تكامل f(x)</code></li>
-        <li>المعادلات: مثال: <code>x^2 - 5*x + 6 = 0</code></li>
-        <li>نظام معادلات (افصل بـ ;): <code>x+y=1; 2*x-3*y=5</code></li>
-        <li>مصفوفات: <code>det([[1,2],[3,4]])</code>، <code>inv([[1,2],[3,4]])</code>، <code>rref([[...]]</code>)</li>
-        <li>من الكاميرا: اضغط <b>📷 صورة مسألة</b> ثم تأكد من تصحيح الرموز إن لزم (× ⇒ <code>*</code> ، ÷ ⇒ <code>/</code> ، √ ⇒ <code>sqrt</code> …).</li>
-      </ul>
-    </div>
+    <summary><strong>دليل الاستخدام السريع</strong></summary>
+    <ul>
+      <li>العمليات: <code>2+3*(4-1)</code> — الأسس: <code>x^2</code> أو <code>x**2</code></li>
+      <li>الدوال: <code>sin(x)</code>، <code>cos(x)</code>، <code>tan(x)</code>، <code>log(x)</code>، <code>exp(x)</code>، <code>sqrt(x)</code></li>
+      <li>المثلثيات تُحسب بالدرجات تلقائيًا: <code>sin(60)=sin(π/3)</code></li>
+      <li>التفاضل: اختر "تفاضل" أو اكتب <code>مشتق …</code> — التكامل: "تكامل" أو <code>تكامل …</code></li>
+      <li>معادلات: <code>x^2 - 5*x + 6 = 0</code> — نظام: <code>x+y=1; 2*x-y=4</code></li>
+      <li>مصفوفات: <code>det([[...]]), inv([[...]]), rref([[...]])</code></li>
+      <li>📷 التقط صورة للمسألة أو اختر من الاستديو — سيُقرأ النص ويُنظَّف ويُحل تلقائيًا.</li>
+    </ul>
   </details>
 </section>
 
 <section id="steps" class="card" style="margin-top:14px"></section>
 <section id="result" class="card" style="margin-top:14px"></section>
 
+<script src="/static/main.js"></script>
+
 <script>
-  // تسجيل Service Worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/static/pwa/sw.js').catch(()=>{});
   }
 
   const $ = s => document.querySelector(s);
-  const q = $("#q");
-  const modeSel = $("#mode");
-  const solveBtn = $("#solveBtn");
-  const stepsDiv = $("#steps");
-  const resultDiv = $("#result");
+  const q = $("#q"), modeSel = $("#mode"), solveBtn = $("#solveBtn");
+  const stepsDiv = $("#steps"), resultDiv = $("#result");
 
   async function postJSON(url, data){
-    const r = await fetch(url, {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify(data)
-    });
+    const r = await fetch(url, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(data) });
     return r.json();
   }
-
   function insert(text){
     const start = q.selectionStart ?? q.value.length;
     const end = q.selectionEnd ?? q.value.length;
-    const before = q.value.slice(0,start);
-    const after = q.value.slice(end);
-    q.value = before + text + after;
-    const pos = start + text.length;
-    q.focus();
-    q.setSelectionRange(pos,pos);
+    q.value = q.value.slice(0,start) + text + q.value.slice(end);
+    const pos = start + text.length; q.focus(); q.setSelectionRange(pos,pos);
   }
 
-  // لوحة المفاتيح
   document.getElementById("kbd").addEventListener("click", (e)=>{
-    const btn = e.target.closest("button");
-    if(!btn) return;
+    const btn = e.target.closest("button"); if(!btn) return;
     if(btn.dataset.k){ insert(btn.dataset.k); return; }
-
     switch(btn.id){
-      case "bksp": {
-        const s = q.selectionStart ?? q.value.length;
-        if(s>0){
-          q.value = q.value.slice(0,s-1) + q.value.slice(q.selectionEnd ?? s);
-          q.setSelectionRange(s-1, s-1);
-        }
-        q.focus(); break;
-      }
-      case "clr":  q.value=""; q.focus(); break;
+      case "bksp": { const s = q.selectionStart ?? q.value.length;
+        if(s>0){ q.value = q.value.slice(0,s-1) + q.value.slice(q.selectionEnd ?? s); q.setSelectionRange(s-1,s-1); }
+        q.focus(); break; }
+      case "clr": q.value=""; q.focus(); break;
       case "pow2": insert("^2"); break;
-      case "abs":  insert("|x|"); break;
+      case "abs": insert("|x|"); break;
       case "frac": insert("a/b"); break;
-      case "ddx":  modeSel.value="derivative"; break;
+      case "ddx": modeSel.value="derivative"; break;
       case "intg": modeSel.value="integral"; break;
-      case "mat":  insert("[[1,2],[3,4]]"); modeSel.value="matrix"; break;
-      case "eq":   insert(" = "); break;
+      case "mat": insert("[[1,2],[3,4]]"); modeSel.value="matrix"; break;
+      case "eq": insert(" = "); break;
       case "comma": insert(","); break;
       case "semi": insert("; "); break;
       case "lbrack": insert("["); break;
       case "rbrack": insert("]"); break;
     }
   });
-
-  // قوالب الدوال sin/...
   document.querySelectorAll('[data-t]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      const f = btn.dataset.t;
-      insert(f + "()");
-      const pos = (q.selectionStart ?? q.value.length) - 1;
-      q.setSelectionRange(pos,pos);
-      q.focus();
+      const f = btn.dataset.t; insert(f + "()");
+      const pos = (q.selectionStart ?? q.value.length) - 1; q.setSelectionRange(pos,pos); q.focus();
     });
   });
-
-  // أمثلة
   $("#example1").onclick = ()=>{ q.value="3*(2-6)/(12+8)"; modeSel.value="evaluate"; };
-  $("#example2").onclick = ()=>{ q.value="x^3*sin(x)";    modeSel.value="derivative"; };
-  $("#example3").onclick = ()=>{ q.value="x+y=1; 2*x-3*y=5"; modeSel.value="solve"; };
+  $("#example2").onclick = ()=>{ q.value="x^3*sin(x)"; modeSel.value="derivative"; };
+  $("#example3").onclick = ()=>{ q.value="x+y=1; 2*x-y=4"; modeSel.value="solve"; };
 
-  // تنفيذ الحل
   solveBtn.onclick = async ()=>{
-    const query = q.value.trim();
-    if(!query){ return; }
-    stepsDiv.innerHTML = "<p>⏳ جاري الحل…</p>";
-    resultDiv.innerHTML = "";
+    const query = q.value.trim(); if(!query) return;
+    stepsDiv.innerHTML = "<p>⏳ جاري الحل…</p>"; resultDiv.innerHTML = "";
     try{
       const data = await postJSON("/solve", { q: query, mode: modeSel.value });
-      if(!data.ok){
-        stepsDiv.innerHTML = `<p style="color:#ff6b6b">❌ ${data.error}</p>`;
-        return;
-      }
-      let html = "";
-      (data.steps||[]).forEach(s=>{
-        html += `<div class="step"><b>${s.title}:</b><br>${s.content}</div>`;
-      });
-      stepsDiv.innerHTML = html || "<p>لا توجد خطوات.</p>";
+      if(!data.ok){ stepsDiv.innerHTML = `<p style="color:#ff6b6b">❌ ${data.error}</p>`; return; }
+      stepsDiv.innerHTML = (data.steps||[]).map(s=>`<div class="step"><b>${s.title}:</b><br>${s.content}</div>`).join("") || "<p>لا توجد خطوات.</p>";
       resultDiv.innerHTML = `<h3>النتيجة:</h3><p style="font-size:1.1rem">${data.result}</p>`;
-    }catch(err){
-      stepsDiv.innerHTML = `<p style="color:#ff6b6b">❌ ${err}</p>`;
-    }
+    }catch(err){ stepsDiv.innerHTML = `<p style="color:#ff6b6b">❌ ${err}</p>`; }
   };
-  q.addEventListener("keydown",(e)=>{
-    if(e.key==="Enter" && (e.metaKey||e.ctrlKey||!e.shiftKey)){ e.preventDefault(); solveBtn.click(); }
-  });
+  q.addEventListener("keydown",(e)=>{ if(e.key==="Enter" && (e.metaKey||e.ctrlKey||!e.shiftKey)){ e.preventDefault(); solveBtn.click(); }});
 
-  // --------- 📷 الكاميرا + OCR ----------
-  const cameraBtn = $("#cameraBtn");
-  const imgInput  = $("#imgInput");
-  const ocrPrev   = $("#ocrPreview");
-  const ocrStatus = $("#ocrStatus");
+  // --------- OCR: كاميرا + استديو ----------
+  const cameraBtn = document.querySelector("#cameraBtn");
+  const galleryBtn = document.querySelector("#galleryBtn");
+  const camInput  = document.querySelector("#camInput");
+  const galInput  = document.querySelector("#galInput");
+  const ocrPrev   = document.querySelector("#ocrPreview");
+  const ocrStatus = document.querySelector("#ocrStatus");
 
-  cameraBtn.onclick = ()=> imgInput.click();
+  cameraBtn.onclick = ()=> camInput.click();
+  galleryBtn.onclick = ()=> galInput.click();
+  camInput.onchange = (e)=> handleImageFile(e.target.files?.[0]);
+  galInput.onchange = (e)=> handleImageFile(e.target.files?.[0]);
 
-  imgInput.onchange = async (e)=>{
-    const file = e.target.files?.[0];
+  async function handleImageFile(file){
     if(!file) return;
-
-    // عرض المعاينة
-    ocrPrev.src = URL.createObjectURL(file);
-    ocrPrev.classList.remove("hidden");
-
-    // تشغيل OCR
+    ocrPrev.src = URL.createObjectURL(file); ocrPrev.classList.remove("hidden");
     ocrStatus.textContent = "🔎 قراءة النص من الصورة…";
     try{
-      const res = await Tesseract.recognize(file, 'eng', {
-        logger: m => {
-          if(m.status === 'recognizing text'){
-            ocrStatus.textContent = `🔎 التعرف: ${Math.round(m.progress*100)}%`;
-          }
-        }
+      const { data } = await Tesseract.recognize(file, 'eng+ara', {
+        logger: m => { if(m.status === 'recognizing text'){ ocrStatus.textContent = `🔎 التعرف: ${Math.round(m.progress*100)}%`; } }
       });
-      let text = (res.data.text || "").trim();
+      let text = (data.text || "").trim();
       text = normalizeOcr(text);
-      // أدرج النص في مربع المسألة وشغّل الحل تلقائيًا
       q.value = text;
-      ocrStatus.textContent = "✅ تم التقاط النص. اضغط حل أو سيتم الحل تلقائيًا…";
-      setTimeout(()=>solveBtn.click(), 300);
-    }catch(err){
-      ocrStatus.textContent = "❌ فشل التعرف على النص";
-      console.error(err);
-    }
-  };
-
-  // تنظيف وتحويل نص الـOCR إلى صيغة رياضية مناسبة لـ SymPy
+      ocrStatus.textContent = "✅ تم الالتقاط. جاري الحل…";
+      setTimeout(()=> solveBtn.click(), 200);
+    }catch(err){ console.error(err); ocrStatus.textContent = "❌ فشل التعرف على النص"; }
+  }
   function normalizeOcr(t){
-    // توحيد الأرقام العربية/الرموز
-    const arabicNums = '٠١٢٣٤٥٦٧٨٩';
-    const latinNums  = '0123456789';
-    for(let i=0;i<10;i++){
-      t = t.replaceAll(arabicNums[i], latinNums[i]);
-    }
-    return t
-      .replace(/[×xX] ?(?=\d|\w)/g, '*')      // × أو x كضرب (تقريبية)
-      .replace(/÷/g, '/')
-      .replace(/–|—/g, '-')
-      .replace(/√/g, 'sqrt')
-      .replace(/π/g, 'pi')
-      .replace(/،/g, ',')
-      .replace(/\s*=\s*/g, ' = ')
-      .replace(/[^\S\r\n]+/g, ' ')            // مسافات زائدة
-      .replace(/\s*\n+\s*/g, '; ')            // أسطر جديدة → نظام معادلات
-      .replace(/\s*\)\s*/g, ')')
-      .replace(/\s*\(\s*/g, '(')
-      .trim();
+    const arabicNums='٠١٢٣٤٥٦٧٨٩', latin='0123456789';
+    for(let i=0;i<10;i++){ t = t.replaceAll(arabicNums[i], latin[i]); }
+    return t.replace(/[×xX]\s*(?=(\d|\w|\())/g,'*')
+            .replace(/÷/g,'/').replace(/–|—/g,'-').replace(/√/g,'sqrt')
+            .replace(/π/g,'pi').replace(/،/g,',').replace(/\s*=\s*/g,' = ')
+            .replace(/\s*\n+\s*/g,'; ').replace(/\s+\)/g,')').replace(/\(\s+/g,'(')
+            .replace(/[^\S\r\n]+/g,' ').trim();
   }
 </script>
-
 </body>
 </html>
