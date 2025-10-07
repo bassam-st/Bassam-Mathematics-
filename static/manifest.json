@@ -1,1 +1,33 @@
-
+{
+  "name": "Bassam Math Pro — Solver",
+  "short_name": "Bassam Math",
+  "description": "حل مسائل الرياضيات بالخطوات: من الابتدائي إلى الهندسة (تفاضل، تكامل، معادلات، مصفوفات، Eigen, Jordan).",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0b0f19",
+  "background_color": "#0b0f19",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable any" }
+  ],
+  "shortcuts": [
+    {
+      "name": "مشتقة",
+      "short_name": "مشتقة",
+      "url": "/?q=%D9%85%D8%B4%D8%AA%D9%82%20x%5E3%20%2A%20sin(x)",
+      "description": "افتح التطبيق مع مثال اشتقاق جاهز"
+    },
+    {
+      "name": "تكامل",
+      "short_name": "تكامل",
+      "url": "/?q=%D8%AA%D9%83%D8%A7%D9%85%D9%84%201%2F(x%2B1)",
+      "description": "افتح التطبيق مع مثال تكامل جاهز"
+    }
+  ],
+  "prefer_related_applications": false
+}
