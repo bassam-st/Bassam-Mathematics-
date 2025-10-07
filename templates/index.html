@@ -4,9 +4,28 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>بسام ماث — Bassam Mathematics Pro</title>
+
+  <!-- PWA -->
   <link rel="manifest" href="/static/pwa/manifest.json">
   <meta name="theme-color" content="#0b0f19"/>
+
+  <!-- ستايل عام -->
   <link rel="stylesheet" href="/static/style.css"/>
+
+  <style>
+    /* تحسينات بسيطة للوحة المفاتيح */
+    .kbd {display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:12px}
+    .kbd button{padding:12px;border:none;border-radius:10px;background:#2a2f45;color:#fff;font-weight:600}
+    .kbd button:hover{background:#353c59}
+    .kbd .primary{background:#7c5cff;color:#111}
+    .kbd .danger{background:#ff4d6d}
+    .row{display:flex;gap:8px;align-items:center}
+    .row>*{flex:1}
+    #steps .step{margin:10px 0;border-bottom:1px solid #3b3f59;padding-bottom:6px}
+    details.help{margin-top:14px;background:#131725;padding:12px;border-radius:12px}
+    textarea#q{width:100%;min-height:58px;resize:vertical}
+    .card{max-width:680px}
+  </style>
 </head>
 <body>
 <header class="top">
@@ -14,7 +33,8 @@
 </header>
 
 <section class="card">
-  <input id="q" placeholder="اكتب المسألة أو المعادلة هنا...">
+  <textarea id="q" placeholder="اكتب المسألة هنا… مثل: 3*(2-6)/(12+8) أو مشتق x^3*sin(x)"></textarea>
+
   <div class="row">
     <select id="mode">
       <option value="auto">تلقائي</option>
@@ -24,13 +44,210 @@
       <option value="solve">معادلات</option>
       <option value="matrix">مصفوفات</option>
     </select>
-    <button id="solveBtn">حل 🧮</button>
+    <button id="solveBtn" class="primary">حل 🧮</button>
   </div>
+
+  <!-- لوحة المفاتيح الرياضية -->
+  <div class="kbd" id="kbd">
+    <!-- صف 1 -->
+    <button data-k="7">7</button>
+    <button data-k="8">8</button>
+    <button data-k="9">9</button>
+    <button data-k="/">÷</button>
+    <button data-k="*">×</button>
+    <button data-k="^">x^y</button>
+
+    <!-- صف 2 -->
+    <button data-k="4">4</button>
+    <button data-k="5">5</button>
+    <button data-k="6">6</button>
+    <button data-k="+">+</button>
+    <button data-k="-">−</button>
+    <button data-k="(">(</button>
+
+    <!-- صف 3 -->
+    <button data-k="1">1</button>
+    <button data-k="2">2</button>
+    <button data-k="3">3</button>
+    <button data-k=")">)</button>
+    <button data-k=".">.</button>
+    <button id="bksp" class="danger">⌫</button>
+
+    <!-- صف 4 -->
+    <button data-k="0">0</button>
+    <button data-k="x">x</button>
+    <button data-k="y">y</button>
+    <button data-k="z">z</button>
+    <button data-k="pi">π</button>
+    <button data-k="E">e</button>
+
+    <!-- صف 5 -->
+    <button data-t="sin">sin( )</button>
+    <button data-t="cos">cos( )</button>
+    <button data-t="tan">tan( )</button>
+    <button data-t="log">log( )</button>
+    <button data-t="ln">ln( )</button>
+    <button data-t="sqrt">√( )</button>
+
+    <!-- صف 6 -->
+    <button id="pow2">x²</button>
+    <button id="abs">|x|</button>
+    <button id="frac">a/b</button>
+    <button id="ddx">d/dx</button>
+    <button id="intg">∫</button>
+    <button id="mat">Mat</button>
+
+    <!-- صف 7 -->
+    <button id="eq">=</button>
+    <button id="comma">,</button>
+    <button id="semi">;</button>
+    <button id="lbrack">[</button>
+    <button id="rbrack">]</button>
+    <button id="clr" class="danger">CLR</button>
+  </div>
+
+  <div class="row" style="margin-top:10px">
+    <button id="example1">مثال حساب</button>
+    <button id="example2">مثال تفاضل</button>
+    <button id="example3">مثال نظام</button>
+  </div>
+
+  <details class="help">
+    <summary><strong>دليل الاستخدام السريع (اضغط للفتح/الإغلاق)</strong></summary>
+    <div class="help-grid">
+      <h4>١) كيف أكتب المسألة؟</h4>
+      <ul>
+        <li>الأعداد والعمليات: <code>2+3*(4-1)</code>، الكسور: <code>3/4</code>، الأسس: <code>x^2</code> أو <code>x**2</code></li>
+        <li>الجذر: <code>sqrt(x)</code>، الدوال: <code>sin(x)</code>، <code>cos(x)</code>، <code>log(x)</code>، <code>exp(x)</code></li>
+        <li>التفاضل: اختر الوضع <b>تفاضل</b> أو اكتب <code>مشتق f(x)</code></li>
+        <li>التكامل: اختر الوضع <b>تكامل</b> أو اكتب <code>تكامل f(x)</code></li>
+        <li>المعادلات: مثال درجة ثانية: <code>x^2 - 5*x + 6 = 0</code></li>
+        <li>نظام معادلات (افصل بـ ;): <code>x+y=1; 2*x-3*y=5</code></li>
+        <li>مصفوفات: <code>det([[1,2],[3,4]])</code>، <code>inv([[1,2],[3,4]])</code>، <code>rref([[...]]</code>)</li>
+      </ul>
+      <h4>٢) ملاحظات</h4>
+      <ul>
+        <li>استخدم <b>*</b> للضرب و<b>/</b> للقسمة و<b>^</b> أو <b>**</b> للأس.</li>
+        <li>التطبيق يعرض <b>الخطوات التفصيلية</b> لكل عملية.</li>
+      </ul>
+    </div>
+  </details>
 </section>
 
-<section id="steps"></section>
-<section id="result"></section>
+<section id="steps" class="card" style="margin-top:14px"></section>
+<section id="result" class="card" style="margin-top:14px"></section>
 
-<script src="/static/main.js"></script>
+<script>
+  // تسجيل SW إن وجد
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/static/pwa/sw.js').catch(()=>{});
+  }
+
+  const $ = s => document.querySelector(s);
+  const q = $("#q");
+  const modeSel = $("#mode");
+  const solveBtn = $("#solveBtn");
+  const stepsDiv = $("#steps");
+  const resultDiv = $("#result");
+
+  async function postJSON(url, data){
+    const r = await fetch(url, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(data)
+    });
+    return r.json();
+  }
+
+  function insert(text){
+    const start = q.selectionStart ?? q.value.length;
+    const end = q.selectionEnd ?? q.value.length;
+    const before = q.value.slice(0,start);
+    const after = q.value.slice(end);
+    q.value = before + text + after;
+    const pos = start + text.length;
+    q.focus();
+    q.setSelectionRange(pos,pos);
+  }
+
+  // توصيل أزرار الكيبورد
+  document.getElementById("kbd").addEventListener("click", (e)=>{
+    const btn = e.target.closest("button");
+    if(!btn) return;
+    if(btn.dataset.k){ insert(btn.dataset.k); return; }
+
+    switch(btn.id){
+      case "bksp": { // حذف حرف
+        const s = q.selectionStart ?? q.value.length;
+        if(s>0){
+          q.value = q.value.slice(0,s-1) + q.value.slice(q.selectionEnd ?? s);
+          q.setSelectionRange(s-1, s-1);
+        }
+        q.focus();
+        break;
+      }
+      case "clr":  q.value=""; q.focus(); break;
+      case "pow2": insert("^2"); break;
+      case "abs":  insert("|x|"); break;
+      case "frac": insert("a/b"); break;
+      case "ddx":  modeSel.value="derivative"; break;
+      case "intg": modeSel.value="integral"; break;
+      case "mat":  insert("[[1,2],[3,4]]"); modeSel.value="matrix"; break;
+      case "eq":   insert(" = "); break;
+      case "comma": insert(","); break;
+      case "semi": insert("; "); break;
+      case "lbrack": insert("["); break;
+      case "rbrack": insert("]"); break;
+      default: break;
+    }
+  });
+
+  // دوال بقوالب تلقائية sin(...) إلخ
+  document.querySelectorAll('[data-t]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const f = btn.dataset.t; // sin / cos / ...
+      insert(f + "()");
+      // ضع المؤشر داخل الأقواس
+      const pos = (q.selectionStart ?? q.value.length) - 1;
+      q.setSelectionRange(pos,pos);
+      q.focus();
+    });
+  });
+
+  // أمثلة جاهزة
+  $("#example1").onclick = ()=>{ q.value="3*(2-6)/(12+8)"; modeSel.value="evaluate"; };
+  $("#example2").onclick = ()=>{ q.value="x^3*sin(x)";    modeSel.value="derivative"; };
+  $("#example3").onclick = ()=>{ q.value="x+y=1; 2*x-3*y=5"; modeSel.value="solve"; };
+
+  // زر الحل
+  solveBtn.onclick = async ()=>{
+    const query = q.value.trim();
+    if(!query){ return; }
+    stepsDiv.innerHTML = "<p>⏳ جاري الحل…</p>";
+    resultDiv.innerHTML = "";
+
+    try{
+      const data = await postJSON("/solve", { q: query, mode: modeSel.value });
+      if(!data.ok){
+        stepsDiv.innerHTML = `<p style="color:#ff6b6b">❌ ${data.error}</p>`;
+        return;
+      }
+      let html = "";
+      (data.steps||[]).forEach(s=>{
+        html += `<div class="step"><b>${s.title}:</b><br>${s.content}</div>`;
+      });
+      stepsDiv.innerHTML = html || "<p>لا توجد خطوات.</p>";
+      resultDiv.innerHTML = `<h3>النتيجة:</h3><p style="font-size:1.1rem">${data.result}</p>`;
+    }catch(err){
+      stepsDiv.innerHTML = `<p style="color:#ff6b6b">❌ ${err}</p>`;
+    }
+  };
+
+  // Enter للتنفيذ
+  q.addEventListener("keydown",(e)=>{
+    if(e.key==="Enter" && (e.metaKey||e.ctrlKey||!e.shiftKey)){ e.preventDefault(); solveBtn.click(); }
+  });
+</script>
+
 </body>
 </html>
