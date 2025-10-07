@@ -1,192 +1,257 @@
-import os
-from flask import Flask, render_template, request, jsonify
-import sympy as sp
-from sympy.parsing.sympy_parser import (
-    standard_transformations, implicit_multiplication_application
+# main.py  — Bassam Math v7.1 (Flask)
+# شرح عربي + دعم x^2 و 3x + تفاضل/تكامل/حل معادلات وحسابات
+# مهيّأ لـ Render (HTTP على port 10000) ويُفضَّل تشغيله بـ gunicorn
+
+from __future__ import annotations
+from flask import Flask, request, jsonify, send_from_directory
+from sympy import (
+    symbols, Eq, sin, cos, tan, asin, acos, atan,
+    sqrt, pi, sympify, simplify, diff, integrate, solve, SympifyError
 )
+from sympy.parsing.sympy_parser import (
+    parse_expr, standard_transformations, implicit_multiplication_application
+)
+import re, os
 
-app = Flask(__name__, static_url_path="/static", template_folder="templates")
+app = Flask(__name__, static_folder="static", template_folder="templates")
 
-# رموز شائعة
-x, y, z, t = sp.symbols("x y z t")
-pi = sp.pi
+# ===== إعدادات عامّة =====
+x, y, z = symbols("x y z")  # المتغيّرات الافتراضية
+DEFAULT_VAR = x
 
+# تحويلات آمنة للقراءة (x^2 -> x**2) + ضرب ضمني (3x -> 3*x)
 TRANSFORMS = standard_transformations + (implicit_multiplication_application,)
 
-def _parse(expr_text: str):
-    local = {
-        "x": x, "y": y, "z": z, "t": t,
-        "sin": sp.sin, "cos": sp.cos, "tan": sp.tan,
-        "log": sp.log, "ln": sp.log, "sqrt": sp.sqrt,
-        "Abs": sp.Abs, "pi": sp.pi, "e": sp.E, "E": sp.E,
-    }
-    return sp.sympify(expr_text, locals=local, transformations=TRANSFORMS)
+# كلمات مفتاحية عربية/إنجليزية لاكتشاف النيّة
+KW_DERIV = ["تفاضل", "مشتق", "اشتق", "derivative", "differentiate", "d/dx"]
+KW_INTEG = ["تكامل", "integral", "integrate", "∫"]
+KW_SOLVE = ["حل", "معادلة", "solve", "="]
+KW_CALC  = ["احسب", "حساب", "evaluate", "calc", "حسِب", "Compute"]
 
-def _to_caret(expr) -> str:
-    return str(expr).replace("**", "^").replace("*", "·")
+# نعتبر الدوال المثلثية بالـ **درجات** افتراضيًا (كما طلبت)
+USE_DEGREES_DEFAULT = True
 
-def _latex(expr) -> str:
+# ========= أدوات مساعدة =========
+def to_python_power(s: str) -> str:
+    """x^2 -> x**2 ، كما نحاول تنظيف مسافات وأحرف عربية شائعة."""
+    s = s.replace("^", "**")
+    # أرقام عربية/هندية إلى إنجليزية
+    trans = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+    s = s.translate(trans)
+    # فواصل عربية
+    s = s.replace("،", ",")
+    # ضرب صريح لبعض الأنماط الشائعة: بين رقم ومتغيّر أو قوس
+    s = re.sub(r"(\d)([a-zA-Z\(])", r"\1*\2", s)  # 3x -> 3*x ، 2(x+1)->2*(x+1)
+    return s
+
+def parse_expression(text: str):
+    """
+    يحوّل نصًا رياضيًا إلى تعبير SymPy مع:
+    - دعم x^2
+    - دعم الضرب الضمني 3x → 3*x
+    """
     try:
-        return sp.latex(expr)
-    except Exception:
-        return sp.latex(sp.sympify(expr))
-
-# --------- بناء شرح مبسط للأطفال ---------
-def explain_evaluate(expr):
-    steps = []
-    steps.append("<h3 class='section-title'>الوضع: حساب عددي</h3>")
-    steps.append("<h4>١) نرتّب التعبير:</h4>")
-    simp = sp.simplify(expr)
-    if str(simp) != str(expr):
-        steps.append(f"<p>قبل: <code>{_to_caret(expr)}</code></p>")
-        steps.append(f"<p>بعد: <code>{_to_caret(simp)}</code></p>")
-    else:
-        steps.append("<p>التعبير واضح ولا يحتاج تبسيط.</p>")
-    out = simp
-    if len(out.free_symbols) == 0:
-        val = sp.N(out, 15)
-        steps.append("<h4>٢) نحسب القيمة:</h4>")
-        steps.append(f"<p>النتيجة العددية ≈ <b>{val}</b></p>")
-    else:
-        steps.append("<h4>٢) نتيجة رمزية:</h4>")
-        steps.append("<p>فيه متغيّرات، فنكتب النتيجة بشكل جبري مبسّط.</p>")
-    return steps, out
-
-def explain_derivative(expr):
-    steps = []
-    steps.append("<h3 class='section-title'>الوضع: تفاضل (مشتقّة)</h3>")
-    steps.append("<h4>١) قاعدة الجمع:</h4><p>نشتق كل حد لوحده ثم نجمع.</p>")
-    steps.append("<h4>٢) قاعدة القوة:</h4><p>مشتق x^n هو n·x^(n-1).</p>")
-    d = sp.diff(expr, x)
-    steps.append(f"<h4>٣) الاشتقاق:</h4><p>d/dx(<code>{_to_caret(expr)}</code>) = <code>{_to_caret(d)}</code></p>")
-    s = sp.simplify(d)
-    if str(s) != str(d):
-        steps.append(f"<h4>٤) تبسيط:</h4><p><code>{_to_caret(d)}</code> ⟶ <code>{_to_caret(s)}</code></p>")
-    return steps, s
-
-def explain_integral(expr):
-    steps = []
-    steps.append("<h3 class='section-title'>الوضع: تكامل</h3>")
-    steps.append("<h4>١) خطية التكامل:</h4><p>نفكّك المجموع ونكامل كل حد.</p>")
-    I = sp.integrate(expr, x)
-    steps.append(f"<h4>٢) نحسب التكامل:</h4><p>∫(<code>{_to_caret(expr)}</code>) dx = <code>{_to_caret(I)}</code> + C</p>")
-    s = sp.simplify(I)
-    if str(s) != str(I):
-        steps.append(f"<h4>٣) تبسيط:</h4><p><code>{_to_caret(I)}</code> ⟶ <code>{_to_caret(s)}</code></p>")
-    steps.append("<p><b>ملاحظة:</b> نضيف ثابت التكامل (+C).</p>")
-    return steps, s
-
-def explain_solve(eqs_text):
-    steps = []
-    steps.append("<h3 class='section-title'>الوضع: حلّ معادلة/نظام</h3>")
-    parts = [p.strip() for p in eqs_text.split(";") if p.strip()]
-    eqs = []
-    try:
-        if len(parts) == 1:
-            if "=" in parts[0]:
-                L, R = parts[0].split("=", 1)
-                eqs.append(sp.Eq(_parse(L), _parse(R)))
-            else:
-                eqs.append(sp.Eq(_parse(parts[0]), 0))
-        else:
-            for p in parts:
-                if "=" in p:
-                    L, R = p.split("=", 1)
-                    eqs.append(sp.Eq(_parse(L), _parse(R)))
-                else:
-                    eqs.append(sp.Eq(_parse(p), 0))
+        text = to_python_power(text)
+        expr = parse_expr(text, transformations=TRANSFORMS)
+        return expr
     except Exception as e:
-        return [f"<p>تعذّر فهم المعادلات: {e}</p>"], None
+        raise SympifyError(str(e))
 
-    for i, eq in enumerate(eqs, 1):
-        steps.append(f"<p>المعادلة {i}: <code>{_to_caret(eq.lhs)}</code> = <code>{_to_caret(eq.rhs)}</code></p>")
+def degreesify(expr):
+    """
+    إذا كان وضع الدرجات مفعّلًا، نحوّل sin(60) إلخ إلى sin(60*pi/180)
+    دون التأثير على sin(x) الرمزية.
+    """
+    # استبدال عدد داخل الدوال المثلثية فقط
+    def _degify(fsym, arg):
+        try:
+            # لو وسيط عددي بحت
+            if arg.free_symbols:
+                return fsym(arg)  # اتركه كما هو (رمزي)
+            return fsym(arg * pi / 180)
+        except Exception:
+            return fsym(arg)
 
-    steps.append("<h4>١) نستخدم طرق جبرية (إحلال/حذف) لحلّ المتغيّرات.</h4>")
-    vars_set = set()
-    for eq in eqs:
-        vars_set |= set(eq.free_symbols)
-    vars_list = sorted(list(vars_set), key=lambda s: s.name) or [x]
-    sol = sp.solve(eqs, *vars_list, dict=True)
+    return (expr
+            .replace(lambda e: e.func == sin and len(e.args) == 1,
+                     lambda e: _degify(sin, e.args[0]))
+            .replace(lambda e: e.func == cos and len(e.args) == 1,
+                     lambda e: _degify(cos, e.args[0]))
+            .replace(lambda e: e.func == tan and len(e.args) == 1,
+                     lambda e: _degify(tan, e.args[0])))
 
-    if not sol:
-        steps.append("<p>لا توجد حلول (قد يكون النظام متناقضًا).</p>")
-        return steps, None
+def detect_intent(text: str) -> str:
+    """يُحاول معرفة المطلوب: derivative / integral / solve / calc"""
+    t = text.strip()
+    low = t.lower()
 
-    if len(sol) == 1:
-        s = sol[0]
-        for k, v in s.items():
-            steps.append(f"<p><b>{k}</b> = <code>{_to_caret(sp.simplify(v))}</code></p>")
-        return steps, s
-    else:
-        for i, s in enumerate(sol, 1):
-            pretty = ", ".join(f"{k}={_to_caret(sp.simplify(v))}" for k, v in s.items())
-            steps.append(f"<p>حل {i}: {pretty}</p>")
-        return steps, sol
-
-def detect_mode(q: str):
-    low = q.lower()
-    if any(w in low for w in ["تفاضل", "مشتق", "d/dx", "deriv"]):
-        return "derivative"
-    if any(w in low for w in ["تكامل", "integr", "∫"]):
-        return "integral"
-    if "=" in q or ";" in q:
+    # إن وُجدت علامة = نميل لنمط حل المعادلات
+    if "=" in t:
         return "solve"
-    return "evaluate"
 
-@app.get("/")
-def index():
-    return render_template("index.html")
+    # كلمات مفتاحية
+    if any(k in t for k in KW_DERIV) or any(k in low for k in ["derivative", "d/dx"]):
+        return "derivative"
+    if any(k in t for k in KW_INTEG) or "integral" in low:
+        return "integral"
+    if any(k in t for k in KW_SOLVE):
+        return "solve"
+    if any(k in t for k in KW_CALC):
+        return "calc"
 
-@app.post("/api/solve")
-def api_solve():
-    data = request.get_json(force=True, silent=True) or {}
-    raw = (data.get("q") or "").strip()
-    if not raw:
-        return jsonify({"ok": False, "error": "أدخل مسألة."}), 400
+    # افتراضيًا: حساب/تبسيط
+    return "calc"
 
+def strip_command_words(t: str) -> str:
+    """يحذف كلمات الأوامر مثل (تفاضل، تكامل، حل...) ويعيد الجزء الرياضي فقط."""
+    words = KW_DERIV + KW_INTEG + KW_SOLVE + KW_CALC + ["مشتقة", "اشتقاق", "اشتق", "إيجاد", "ايجاد"]
+    out = t
+    for w in sorted(words, key=len, reverse=True):
+        out = re.sub(rf"\b{re.escape(w)}\b", " ", out, flags=re.IGNORECASE)
+    # إحلال الإشارة =
+    out = out.replace("= 0", "=0").strip()
+    return out.strip()
+
+def arabic_poly(expr) -> str:
+    """عرض ودّي: x**3 -> x^3 ، * -> (مخفي)، مع أرقام عادية؛ لأجل القراءة."""
+    s = str(expr)
+    s = s.replace("**", "^")
+    s = s.replace("*", "·")
+    return s
+
+# ========= محلّلات و حلول =========
+def solve_calc(expr_text: str, use_degrees=True):
+    steps = []
     try:
-        mode = detect_mode(raw)
-        if mode == "solve":
-            steps, out = explain_solve(raw)
-            if out is None:
-                return jsonify({"ok": False, "error": "تعذّر حلّ المعادلة/النظام."}), 400
-            # صيغة العرض
-            if isinstance(out, dict):
-                pretty_text = "; ".join(f"{k}={_to_caret(sp.simplify(v))}" for k, v in out.items())
-                latex_text  = _latex(sp.Matrix([[sp.simplify(v) for v in out.values()]]))
-            else:
-                pretty_text = " ; ".join(", ".join(f"{k}={_to_caret(sp.simplify(v))}" for k, v in s.items()) for s in out)
-                latex_text  = _latex(sp.Matrix([[sp.simplify(v) for v in out[0].values()]]))
-            return jsonify({"ok": True, "steps_html": "\n".join(steps), "pretty": {"en_text": pretty_text, "ar_latex": latex_text}})
-
-        # للباقي نحلّل كتعابير
-        expr = _parse(raw)
-        if mode == "derivative":
-            steps, result = explain_derivative(expr)
-        elif mode == "integral":
-            steps, result = explain_integral(expr)
-        else:
-            steps, result = explain_evaluate(expr)
-
-        caret_text = _to_caret(result if result is not None else expr)
-        latex_text = _latex(result if result is not None else expr)
-
-        numeric_value = None
-        if hasattr(result, "free_symbols") and len(result.free_symbols) == 0:
-            try:
-                numeric_value = str(sp.N(result, 15))
-            except Exception:
-                pass
-
-        return jsonify({
-            "ok": True,
-            "steps_html": "\n".join(steps),
-            "pretty": {"en_text": caret_text, "ar_latex": latex_text},
-            "numeric_value": numeric_value
-        })
+        expr = parse_expression(expr_text)
+        if use_degrees:
+            expr = degreesify(expr)
+        simp = simplify(expr)
+        steps.append("نقوم بتبسيط التعبير خطوة بخطوة.")
+        steps.append(f"التعبير بعد التبسيط: {arabic_poly(simp)}")
+        # قيمة عددية تقربية إن أمكن (بدقّة معقولة)
+        val = None
+        try:
+            val = float(simp.evalf(15))
+            steps.append(f"القيمة النهائية (تقريبًا): {val}")
+        except Exception:
+            steps.append("التعبير رمزي ولا يقيَّم عدديًا مباشرة.")
+        return {"mode": "حساب", "steps": steps, "result": str(simp if val is None else val)}
     except Exception as e:
-        return jsonify({"ok": False, "error": f"خطأ في القراءة/الحل: {e}"}), 400
+        return {"error": f"خطأ في القراءة/الحساب: {e}"}
 
+def solve_derivative(expr_text: str, var=DEFAULT_VAR, use_degrees=True):
+    steps = []
+    try:
+        # السماح بصيغ مثل: y = 3x^3 - 5x^2 + ...
+        if "=" in expr_text:
+            rhs = expr_text.split("=", 1)[1]
+        else:
+            rhs = expr_text
+        expr = parse_expression(rhs)
+        if use_degrees:
+            expr = degreesify(expr)
+        steps.append(f"المطلوب: إيجاد المشتقة بالنسبة إلى {var}.")
+        steps.append(f"الدالة: {arabic_poly(expr)}")
+        dexpr = diff(expr, var)
+        steps.append("نشتق كل حد على حدة ثم نجمع الحدود.")
+        steps.append(f"المشتقة المبسّطة: {arabic_poly(simplify(dexpr))}")
+        return {"mode": "تفاضل", "steps": steps, "result": str(simplify(dexpr))}
+    except Exception as e:
+        return {"error": f"خطأ في التفاضل: {e}"}
+
+def solve_integral(expr_text: str, var=DEFAULT_VAR, use_degrees=True):
+    steps = []
+    try:
+        if "=" in expr_text:
+            rhs = expr_text.split("=", 1)[1]
+        else:
+            rhs = expr_text
+        expr = parse_expression(rhs)
+        if use_degrees:
+            expr = degreesify(expr)
+        steps.append(f"المطلوب: تكامل للدالة بالنسبة إلى {var}.")
+        steps.append(f"الدالة: {arabic_poly(expr)}")
+        iexpr = integrate(expr, var)
+        steps.append("نستخدم قواعد التكامل حدًا حدًا (قوة/جمع/ثوابت...).")
+        steps.append(f"ناتج التكامل (بدون ثابت C): {arabic_poly(simplify(iexpr))}")
+        return {"mode": "تكامل", "steps": steps, "result": str(simplify(iexpr))}
+    except Exception as e:
+        return {"error": f"خطأ في التكامل: {e}"}
+
+def solve_equation(expr_text: str, var=DEFAULT_VAR, use_degrees=True):
+    steps = []
+    try:
+        # ندعم:  "3x^2=7" أو "حل 3x^2-7=0"
+        if "=" not in expr_text:
+            # لو ما فيه = نعتبره = 0
+            expr_text = f"{expr_text}=0"
+        left, right = expr_text.split("=", 1)
+        L = parse_expression(left)
+        R = parse_expression(right)
+        if use_degrees:
+            L = degreesify(L); R = degreesify(R)
+        eq = Eq(L, R)
+        steps.append("نقل كل الحدود لطرف واحد للحصول على صورة قياسية.")
+        standard = simplify(L - R)
+        steps.append(f"الصورة القياسية: {arabic_poly(standard)} = 0")
+        steps.append("نحاول الحل بالتحليل/الصيغ/طرق Sympy المباشرة.")
+        sols = solve(eq, var, dict=True)
+        if not sols:
+            return {"mode": "حل معادلة", "steps": steps + ["لم نجد حلولًا صريحة."], "result": "لا حلول صريحة"}
+        steps.append(f"عدد الحلول: {len(sols)}")
+        res = []
+        for i, sdict in enumerate(sols, 1):
+            val = sdict.get(var)
+            res.append(f"x{i} = {val}")
+        steps.append("ملحوظة: قد تكون بعض الحلول مركّبة إن كانت المعاملات تؤدي لذلك.")
+        return {"mode": "حل معادلة", "steps": steps, "result": "; ".join(res)}
+    except Exception as e:
+        return {"error": f"خطأ في حل المعادلة: {e}"}
+
+# ========= واجهة برمجية بسيطة =========
+@app.route("/solve", methods=["POST"])
+def api_solve():
+    data = request.get_json(silent=True) or {}
+    text = data.get("text", "") or ""
+    prefer = data.get("prefer", "").strip().lower()  # "derivative|integral|solve|calc"
+    deg = data.get("degrees", USE_DEGREES_DEFAULT)
+    if not isinstance(deg, bool):
+        deg = USE_DEGREES_DEFAULT
+
+    if not text.strip():
+        return jsonify({"error": "يرجى إدخال مسألة."}), 400
+
+    # اكتشاف النيّة
+    intent = prefer if prefer in ["derivative", "integral", "solve", "calc"] else detect_intent(text)
+    pure = strip_command_words(text)
+
+    # حل حسب النيّة
+    if intent == "derivative":
+        out = solve_derivative(pure, DEFAULT_VAR, use_degrees=deg)
+    elif intent == "integral":
+        out = solve_integral(pure, DEFAULT_VAR, use_degrees=deg)
+    elif intent == "solve":
+        out = solve_equation(pure, DEFAULT_VAR, use_degrees=deg)
+    else:
+        out = solve_calc(pure, use_degrees=deg)
+
+    return jsonify(out), (200 if "error" not in out else 400)
+
+# صفحة اختبار بسيطة (اختيارية): إن لديك templates/index.html ستُستخدم
+@app.route("/")
+def root():
+    # إن لم توجد صفحة، أعدّ رسالة نصية بسيطة
+    index_path = os.path.join(app.template_folder or "", "index.html")
+    if os.path.exists(index_path):
+        return send_from_directory(app.template_folder, "index.html")
+    return (
+        "<h1>Bassam Math v7.1</h1>"
+        "<p>POST /solve مع JSON مثل: {\"text\":\"تفاضل 3x^3-5x^2+4x-7\",\"degrees\":true}</p>"
+    )
+
+# ===== تشغيل محلي (للاختبار فقط) =====
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", "8000"))
-    app.run(host="0.0.0.0", port=port)
+    # عند التشغيل المحلي:
+    port = int(os.environ.get("PORT", "10000"))
+    app.run(host="0.0.0.0", port=port, debug=False)
