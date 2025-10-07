@@ -1,12 +1,14 @@
 {
-  "name": "Bassam Mathematics Pro",
-  "short_name": "Bassam Math",
+  "name": "بسام ماث بروفيسور v7",
+  "short_name": "بسام ماث",
   "lang": "ar",
   "dir": "rtl",
-  "display": "standalone",
   "start_url": "/",
+  "display": "standalone",
   "background_color": "#0b0f19",
-  "theme_color": "#b896ff",
+  "theme_color": "#0b0f19",
+  "orientation": "portrait",
+  "description": "حلول رياضيات مبسطة للطلاب مع شرح بالعربية وكاميرا OCR.",
   "icons": [
     { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
