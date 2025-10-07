@@ -1,19 +1,15 @@
-// static/main.js — Bassam Math Pro v2.5 (UI + OCR + Arabic steps)
-// يعمل مع templates/index.html و main.py (Auto + Degrees)
+// static/main.js — Bassam Math Pro v2.6 (UI + Strong OCR + Arabic NLU)
 
 (function () {
-  // --------- عناصر الواجهة ---------
   const qInput   = document.getElementById("q");
   const modeSel  = document.getElementById("mode");
   const form     = document.getElementById("solveForm");
   const output   = document.getElementById("output");
-
   const kbd      = document.getElementById("keyboard");
   const cameraBtn= document.getElementById("cameraBtn");
   const galleryBtn=document.getElementById("galleryBtn");
   const fileInput= document.getElementById("fileInput");
 
-  // --------- أدوات مساعدة ---------
   const AR_DIGITS = "٠١٢٣٤٥٦٧٨٩";
   const EN_DIGITS = "0123456789";
 
@@ -34,31 +30,73 @@
     }).join("");
   }
 
-  // تنظيف نص الـ OCR (وبشكل عام قبل الإرسال)
-  function normalizeOCR(t) {
+  // ----------------- تطبيع نص المستخدم/الـ OCR -----------------
+  function replaceArabicMathWords(t) {
+    const pairs = [
+      ["القيمة المطلقة", "Abs"],
+      ["قيمة مطلقة", "Abs"],
+      ["جذر تربيعي", "sqrt"],
+      ["جذر مربع", "sqrt"],
+      ["جذر", "sqrt"],
+      ["يساوي", "="], ["تساوي", "="],
+      ["زائد", "+"], ["جمع", "+"],
+      ["ناقص", "-"], ["طرح", "-"],
+      ["في", "*"], ["ضرب", "*"],
+      ["على", "/"], ["قسمة", "/"],
+      ["باي", "pi"],
+    ];
+    // استبدال بطول-أطول لتفادي تداخل العبارات
+    pairs.sort((a, b) => b[0].length - a[0].length);
+    let s = " " + t + " ";
+    pairs.forEach(([w, v]) => {
+      const re = new RegExp(`(?<!\\w)${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?!\\w)`, "g");
+      s = s.replace(re, ` ${v} `);
+    });
+    return s.trim();
+  }
+
+  function normalizePlain(t) {
     t = t || "";
+    // إزالة محارف الاتجاه/التحكم
+    t = t.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "");
+
+    // أرقام عربية -> إنجليزية
     t = arabicToEnDigits(t);
+
+    // توحيد الرموز
     t = t
-      .replace(/[×xX]\s*(?=(\d|\w|\())/g, "*")
+      .replace(/[×]/g, "*")
       .replace(/÷/g, "/")
       .replace(/–|—/g, "-")
       .replace(/√/g, "sqrt")
       .replace(/π/g, "pi")
       .replace(/،/g, ",")
-      .replace(/\s*=\s*/g, " = ")
-      .replace(/\s*\n+\s*/g, "; ")
-      .replace(/\s+\)/g, ")")
-      .replace(/\(\s+/g, "(")
-      .replace(/[^\S\r\n]+/g, " ")
-      .trim();
+      .replace(/\^/g, "**")
+      .replace(/\s*=\s*/g, " = ");
 
     // |x| -> Abs(x)
-    try {
-      t = t.replace(/\|([^|]+)\|/g, "Abs($1)");
-    } catch {}
-    // ^ -> ** للأسس
-    t = t.replace(/\^/g, "**");
+    try { t = t.replace(/\|([^|]+)\|/g, "Abs($1)"); } catch {}
+
+    // sin 60 درجة -> sin(60)
+    t = t.replace(/\b(sin|cos|tan)\s+([+\-]?\d+(?:\.\d+)?)\s*(?:درجة|°)/g, "$1($2)");
+    // sin x -> sin(x)
+    t = t.replace(/\b(sin|cos|tan)\s+([A-Za-z0-9_.+-]+)/g, "$1($2)");
+
+    // كلمات عربية رياضية
+    t = replaceArabicMathWords(t);
+
+    // إزالة أي محارف ليست من المجموعة الآمنة (نستثني أسماء الدوال والمتغيرات)
+    t = t.replace(/[^0-9A-Za-z+\-*/=^().,;_| \t\r\n\[\]π]/g, " ");
+
+    // تنظيف المسافات
+    t = t.replace(/\s+\)/g, ")").replace(/\(\s+/g, "(").replace(/[^\S\r\n]+/g, " ").trim();
+
     return t;
+  }
+
+  function normalizeOCR(t) {
+    // نفس normalizePlain لكن مع تشديد أكبر
+    return normalizePlain(t);
   }
 
   function setLoading(msg = "⏳ جاري الحل…") {
@@ -70,7 +108,6 @@
   }
 
   function renderSolution(data) {
-    // data = { ok, mode, result, steps[] }
     let html = "";
     const modeLabel = {
       "evaluate": "حساب",
@@ -86,7 +123,6 @@
     if (Array.isArray(data.steps) && data.steps.length) {
       html += `<div class="steps">`;
       data.steps.forEach((s, i) => {
-        // في solver v2.5 الخطوات عبارة عن نصوص، وليس title/content
         if (typeof s === "string") {
           html += `<div class="step"><b>الخطوة ${i + 1}:</b><br>${s}</div>`;
         } else if (s && s.title) {
@@ -109,14 +145,24 @@
     return r.json();
   }
 
-  // --------- إرسال للحل ---------
+  // قبل الإرسال: طبيع/نظّف
+  function preprocessInput(raw) {
+    return normalizePlain(raw);
+  }
+
+  // ----------------- حل الآن -----------------
   async function solveNow() {
-    const raw = (qInput.value || "").trim();
+    let raw = (qInput.value || "").trim();
     if (!raw) return;
+
+    // طبيع مسبق قبل الإرسال
+    const cleaned = preprocessInput(raw);
+    qInput.value = cleaned;
+
     setLoading();
 
     try {
-      const payload = { q: raw, mode: modeSel.value || "auto" };
+      const payload = { q: cleaned, mode: (modeSel.value || "auto") };
       const data = await postJSON("/solve", payload);
       if (!data.ok) return showError(data.error || "فشل الحل");
       renderSolution(data);
@@ -125,13 +171,12 @@
     }
   }
 
-  // --------- أحداث الواجهة ---------
+  // أحداث
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     solveNow();
   });
 
-  // إدخال سريع عبر Enter (بدون Shift)
   qInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -139,7 +184,7 @@
     }
   });
 
-  // لوحة المفاتيح الرياضية
+  // لوحة المفاتيح
   if (kbd) {
     kbd.addEventListener("click", (e) => {
       const btn = e.target.closest("button");
@@ -152,39 +197,38 @@
           qInput.focus();
           return;
         case "d/dx":
-          modeSel.value = "derivative";
-          qInput.focus();
-          return;
+          modeSel.value = "derivative"; qInput.focus(); return;
         case "∫":
-          modeSel.value = "integral";
-          qInput.focus();
-          return;
+          modeSel.value = "integral"; qInput.focus(); return;
         case "|x|":
-          insertAtCursor("Abs(x)");
-          return;
-        case "sin(":
-        case "cos(":
-        case "tan(":
-        case "Abs(":
+          insertAtCursor("Abs(x)"); return;
         case "√":
-          if (val === "√") {
-            insertAtCursor("sqrt()");
-          } else {
-            insertAtCursor(val + ")");
+          insertAtCursor("sqrt()"); {
+            const pos = (qInput.selectionStart ?? qInput.value.length) - 1;
+            qInput.setSelectionRange(pos, pos);
           }
-          // ضع المؤشر قبل القوس الأخير
-          const pos = (qInput.selectionStart ?? qInput.value.length) - 1;
-          qInput.setSelectionRange(pos, pos);
-          qInput.focus();
           return;
-        case "×":
-          insertAtCursor("*"); return;
-        case "÷":
-          insertAtCursor("/"); return;
         case "π":
           insertAtCursor("pi"); return;
-        case "^":
-          insertAtCursor("**"); return;
+        case "×": insertAtCursor("*"); return;
+        case "÷": insertAtCursor("/"); return;
+        case "^": insertAtCursor("**"); return;
+        case ")sin": insertAtCursor("sin()"); {
+          const pos = (qInput.selectionStart ?? qInput.value.length) - 1;
+          qInput.setSelectionRange(pos, pos);
+        } return;
+        case ")cos": insertAtCursor("cos()"); {
+          const pos = (qInput.selectionStart ?? qInput.value.length) - 1;
+          qInput.setSelectionRange(pos, pos);
+        } return;
+        case ")tan": insertAtCursor("tan()"); {
+          const pos = (qInput.selectionStart ?? qInput.value.length) - 1;
+          qInput.setSelectionRange(pos, pos);
+        } return;
+        case ")Abs": insertAtCursor("Abs()"); {
+          const pos = (qInput.selectionStart ?? qInput.value.length) - 1;
+          qInput.setSelectionRange(pos, pos);
+        } return;
         default:
           insertAtCursor(val);
       }
@@ -192,7 +236,6 @@
   }
 
   // --------- الكاميرا / الأستوديو + OCR ---------
-  // نحمّل Tesseract عند الحاجة فقط (Lazy load)
   let tesseractReady = false;
   function ensureTesseract() {
     return new Promise((resolve, reject) => {
@@ -207,7 +250,6 @@
 
   cameraBtn?.addEventListener("click", async () => {
     try {
-      // بعض المتصفحات تحتاج capture لتشغيل الكاميرا مباشرة
       fileInput.removeAttribute("hidden");
       fileInput.setAttribute("accept", "image/*");
       fileInput.setAttribute("capture", "environment");
@@ -219,7 +261,7 @@
     try {
       fileInput.removeAttribute("hidden");
       fileInput.setAttribute("accept", "image/*");
-      fileInput.removeAttribute("capture"); // يفتح الأستوديو
+      fileInput.removeAttribute("capture");
       fileInput.click();
     } catch {}
   });
@@ -236,24 +278,26 @@
           if (m.status === "recognizing text") {
             setLoading(`🔎 التعرف: ${Math.round(m.progress * 100)}%`);
           }
-        }
+        },
+        // الحد من الحروف لزيادة دقة OCR مع خط اليد
+        tessedit_char_whitelist:
+          "0123456789+-*/=^().,;[]| xXyYzZaAbBcCsSiInNoOtTlLgGpPrReEqQuUhHkKmMdDfF" +
+          "π√"
       });
       let text = (data.text || "").trim();
       text = normalizeOCR(text);
       qInput.value = text;
       setLoading("✅ تم استخراج النص. جاري الحل…");
-      setTimeout(solveNow, 150);
+      setTimeout(solveNow, 120);
     } catch (err) {
       showError("فشل التعرف على النص بالـ OCR");
       console.error(err);
     } finally {
-      // تنظيف الاختيار حتى نقدر نختار نفس الملف لاحقًا
       fileInput.value = "";
     }
   });
 
-  // --------- أمثلة سريعة (اختيارية) ---------
   if (!qInput.value) {
-    qInput.placeholder = "مثال: تفاضل 3*x^3 - 5*x^2 + 4*x - 7  |  sin(60)+25  |  x+y=1; 2*x-y=3";
+    qInput.placeholder = "اكتب مسألة أو حتى بالعربي: اشتق 3x^3-5x^2+4x-7 | sin(60)+cos(30) | x+y=7;2x-y=3";
   }
 })();
