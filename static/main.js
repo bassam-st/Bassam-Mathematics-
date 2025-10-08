@@ -1,55 +1,88 @@
-const $ = (s) => document.querySelector(s);
+/* Bassam Math Pro v8 — Smart Auto Mode
+   واجهة ذكية تعرض النتيجة مثل ChatGPT
+   إعداد: بسّام الذكي 💜
+*/
 
-const qEl = $("#q");
-const modeEl = $("#mode");
-const fmtEl = $("#fmt");
-const outEl = $("#out");
-const solveBtn = $("#solve");
+const qEl = document.getElementById("q");
+const solveBtn = document.getElementById("solveBtn");
+const stepsBox = document.getElementById("steps");
+const resBox = document.getElementById("result");
+const statusBox = document.getElementById("status");
 
-function renderSteps(steps, result) {
-  if (!steps || !steps.length) {
-    outEl.innerHTML = `<div class="res">النتيجة: <b>${result ?? ""}</b></div>`;
-    return;
-  }
+function showStatus(msg, type = "info") {
+  statusBox.className = "status " + type;
+  statusBox.textContent = msg;
+  statusBox.classList.remove("none");
+}
+
+function clearStatus() {
+  statusBox.className = "status none";
+  statusBox.textContent = "";
+}
+
+function renderSteps(steps) {
+  stepsBox.innerHTML = "";
+  if (!steps || !steps.length) return;
   let html = "";
-  for (const [title, body] of steps) {
+  for (let i = 0; i < steps.length; i++) {
     html += `
       <div class="step">
-        <div class="step-title">${title}:</div>
-        <div class="step-body">${body}</div>
+        <div class="step-num">الخطوة ${i + 1}:</div>
+        <div class="step-text">${steps[i]}</div>
       </div>
     `;
   }
-  html += `<div class="result-box"><div class="result-title">النتيجة:</div><div class="result-val">${result ?? ""}</div></div>`;
-  outEl.innerHTML = html;
+  stepsBox.innerHTML = html;
+  if (window.MathJax) MathJax.typesetPromise();
 }
 
-async function solve() {
-  outEl.innerHTML = `<div class="loading">... جاري الحل</div>`;
-  const body = {
-    q: qEl.value,
-    mode: modeEl.value,
-    fmt: fmtEl.value,
-  };
+function renderResult(result) {
+  resBox.innerHTML = result ? `\\(${result}\\)` : "—";
+  if (window.MathJax) MathJax.typesetPromise();
+}
+
+async function solveNow() {
+  clearStatus();
+  stepsBox.innerHTML = "";
+  resBox.innerHTML = "";
+
+  const text = qEl.value.trim();
+  if (!text) {
+    showStatus("⚠️ يرجى كتابة مسألة.", "warn");
+    return;
+  }
+
+  showStatus("⏳ جاري التحليل والحل، يرجى الانتظار...", "info");
 
   try {
-    const res = await fetch("/api/solve", {
+    const r = await fetch("/solve", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ text })
     });
-    const data = await res.json();
+
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(t || "فشل الاتصال بالخادم.");
+    }
+
+    const data = await r.json();
     if (!data.ok) {
-      outEl.innerHTML = `<div class="err">❌ ${data.error || "حدث خطأ غير متوقع."}</div>`;
+      showStatus("❌ " + (data.error || "حدث خطأ أثناء الحل."), "err");
       return;
     }
-    renderSteps(data.steps, data.result);
-  } catch (e) {
-    outEl.innerHTML = `<div class="err">❌ فشل الاتصال بالخادم.</div>`;
+
+    showStatus("✅ تم الحل بنجاح.", "ok");
+    renderSteps(data.steps);
+    renderResult(data.result);
+
+  } catch (err) {
+    console.error(err);
+    showStatus("❌ خطأ في الاتصال أو في تحليل المسألة.", "err");
   }
 }
 
-solveBtn.addEventListener("click", solve);
+solveBtn.addEventListener("click", solveNow);
 qEl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") solve();
+  if (e.key === "Enter") solveNow();
 });
