@@ -1,41 +1,41 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>بسّام ماث — نسخة الطلاب المبسّطة</title>
+  <title>بسّام ماث برو — حل جميع المسائل تلقائيًا</title>
   <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
 </head>
+
 <body>
-  <div class="container">
-    <h1>بسّام ماث — حلّ فوري مع الشرح العربي المبسّط</h1>
+  <main class="wrap">
+    <header class="head">
+      <h1>🧠 بسّام ماث برو v8</h1>
+      <p class="sub">أدخل أي مسألة رياضية وسيقوم التطبيق بالتحليل والحل التلقائي مع شرح الخطوات.</p>
+    </header>
 
-    <div class="card">
-      <label class="lbl">أدخل المسألة أو التعبير:</label>
-      <input id="q" class="in" placeholder='أمثلة: 3x^3 - 5x^2 + 4x - 7  أو  "تفاضل x^3"  أو  "تكامل sin(x)"' />
+    <section class="card">
+      <input id="q" class="inp" placeholder="اكتب المسألة هنا... مثل: تفاضل x^3 - 5x^2 + 4x - 7 أو (x^2-4)/(x-2)" />
+      <button id="solveBtn" class="btn primary">حل الآن ⚡</button>
+    </section>
 
-      <div class="row">
-        <select id="mode" class="sel">
-          <option value="auto">تلقائي</option>
-          <option value="eval">حساب</option>
-          <option value="diff">تفاضل</option>
-          <option value="int">تكامل</option>
-          <option value="eq">حل معادلة (=)</option>
-        </select>
-
-        <select id="fmt" class="sel">
-          <option value="arabic">رياضي مُنسّق (عربي)</option>
-          <option value="english">x^3 - 5x^2 + 4x - 7 (إنجليزي)</option>
-        </select>
-
-        <button id="solve" class="btn">حل الآن 📊</button>
+    <section class="card">
+      <div id="status" class="status none"></div>
+      <div id="steps" class="steps"></div>
+      <div class="resBox">
+        <div class="resTitle">النتيجة النهائية:</div>
+        <div id="result" class="result"></div>
       </div>
+    </section>
 
-      <div id="hint" class="hint">تلميح: يمكنك كتابة "تفاضل …" أو "تكامل …" أو وضع علامة "=" لحل المعادلات.</div>
-
-      <div id="out" class="out"></div>
-    </div>
-  </div>
+    <footer class="foot">
+      <small>© 2025 بسّام الذكي — إصدار Smart Auto Mode v8</small>
+    </footer>
+  </main>
 
   <script src="/static/main.js"></script>
 </body>
