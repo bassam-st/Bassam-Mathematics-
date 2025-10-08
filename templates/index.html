@@ -5,22 +5,44 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>بسّام ماث برو — حل جميع المسائل تلقائيًا</title>
   <link rel="stylesheet" href="/static/style.css" />
+
+  <!-- MathJax للعرض الرياضي -->
   <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
   <script id="MathJax-script" async
     src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
   </script>
+
+  <!-- Tesseract.js للـ OCR (عربي + إنجليزي) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 
 <body>
   <main class="wrap">
     <header class="head">
-      <h1>🧠 بسّام ماث برو v8</h1>
-      <p class="sub">أدخل أي مسألة رياضية وسيقوم التطبيق بالتحليل والحل التلقائي مع شرح الخطوات.</p>
+      <h1>🧠 بسّام ماث برو v8.1</h1>
+      <p class="sub">أدخل أي مسألة رياضية أو التقط صورة لها — التحليل والحل تلقائي مع شرح الخطوات.</p>
     </header>
 
     <section class="card">
-      <input id="q" class="inp" placeholder="اكتب المسألة هنا... مثل: تفاضل x^3 - 5x^2 + 4x - 7 أو (x^2-4)/(x-2)" />
+      <label class="lbl">أدخل المسألة نصيًا:</label>
+      <input id="q" class="inp" placeholder="مثال: تفاضل x^3 - 5x^2 + 4x - 7 أو (x^2-4)/(x-2)" />
       <button id="solveBtn" class="btn primary">حل الآن ⚡</button>
+
+      <div class="row" style="margin-top:12px">
+        <button id="pickImg" class="btn">🖼 من الاستوديو</button>
+        <button id="takeImg" class="btn">📷 من الكاميرا</button>
+        <input id="imgInput" type="file" accept="image/*" hidden />
+      </div>
+
+      <div id="ocrBox" class="card" style="display:none; margin-top:12px">
+        <div class="lbl">النص المستخرج من الصورة (يمكنك تعديله ثم الضغط على "حل الآن"):</div>
+        <textarea id="ocrText" class="inp" style="height:120px"></textarea>
+        <div class="hint" id="ocrHint" style="margin-top:8px"></div>
+        <div class="row" style="margin-top:10px">
+          <button id="applyOcr" class="btn">إرسال للنص أعلاه</button>
+          <button id="clearOcr" class="btn" style="background:#2b3246">مسح نافذة الصورة</button>
+        </div>
+      </div>
     </section>
 
     <section class="card">
@@ -33,7 +55,7 @@
     </section>
 
     <footer class="foot">
-      <small>© 2025 بسّام الذكي — إصدار Smart Auto Mode v8</small>
+      <small>© 2025 بسّام الذكي — إصدار Smart Auto + OCR</small>
     </footer>
   </main>
 
